@@ -467,6 +467,7 @@ async def poll_pair_list(update: Update, context: CallbackContext) -> None:
     else:
         question_list = split_with_numpy(pair_list[chat_id], 10)
         pair_list[chat_id].clear()
+        save_json(FILENAMEPAIRLIST, pair_list)
         for questions in question_list:
             if len(questions) == 1:
                 questions.append("End of List")
