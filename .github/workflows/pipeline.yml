@@ -66,4 +66,4 @@ jobs:
           context: .
           file: ./Dockerfile
           push: true
-          tags: bennert/crypto-scanner:${{ steps.gitversion.outputs.fullSemVer }}
+          tags: bennert/crypto-scanner:version${{ steps.gitversion.outputs.assemblySemVer }}.${{ steps.gitversion.outputs.buildMetaDataPadded }}
