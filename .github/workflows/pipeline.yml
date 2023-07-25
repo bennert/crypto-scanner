@@ -66,4 +66,4 @@ jobs:
           context: .
           file: ./Dockerfile
           push: true
-          tags: bennert/crypto-scanner:${{ steps.gitversion.outputs.nugetVersion }}
+          tags: bennert/crypto-scanner:${{ steps.gitversion.outputs.fullSemVer }}
