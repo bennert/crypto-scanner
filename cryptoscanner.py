@@ -16,7 +16,7 @@ from telegram import KeyboardButton, ReplyKeyboardMarkup, Update
 from telegram.constants import ParseMode
 from telegram.error import TimedOut
 from telegram.ext import (Application, CallbackContext, CommandHandler,
-                          JobQueue, PollAnswerHandler)
+                          PollAnswerHandler)
 
 CMD_START = "Start"
 CMD_START_BUY_SIGNALS = "StartBuySignals"
@@ -33,7 +33,6 @@ CMDDISPLAYMINSTOCHRSI = "DisplayMinStochRsi"
 CMDPOLLMINSTOCHRSI = "PollMinStochRsi"
 
 exchange = ccxt.binance()
-QueueJob = JobQueue
 FILENAMEBUYSIGNALSACTIVE = "./state/buysignalsactive.json"
 FILENAMEMINQUOTEVOLUME = "./state/minquotevol.json"
 FILENAMEBASECOIN = "./state/basecoin.json"
@@ -72,7 +71,6 @@ def save_json(file_name, json_value):
 
 async def generate_pair_list(context: CallbackContext):
     """Generate pair list"""
-    # global updating_pair_list
     msg = await context.job.data["message"].reply_text("Update Pair List")
     update = context.job.data["update"]
     chat_id = str(msg.chat_id)
@@ -85,7 +83,7 @@ async def generate_pair_list(context: CallbackContext):
     min_day_volume = int(min_quote_volume[chat_id])
     heading = \
         f"Get pair list with minimum day volume of {min_day_volume:10,d} {base_coin[chat_id]}\n"
-    job_buy = get_job(chat_id)
+    job_buy = get_job(context.application.job_queue, chat_id)
     if job_buy is not None:
         job_buy.pause()
     exchange.load_markets()
@@ -277,26 +275,22 @@ async def get_buy_signals(context: CallbackContext):
         await poll_min_stockrsi(update, context)
     min_stoch_rsi_value = int(min_stoch_rsi[chat_id])
     timeframe_range = [1, 3, 5]
-    if chat_id not in prev_timefram_minute_list.keys():
+    if chat_id not in prev_timefram_minute_list:
         prev_timefram_minute_list[chat_id] = dict([[x, ""] for x in timeframe_range])
     for timeframe_minute in prev_timefram_minute_list[chat_id]:
         await retrieve_buy_signals(message, timeframe_minute, min_stoch_rsi_value)
 
-def get_job(name):
+def get_job(job_queue, name):
     """Get job by name"""
-    queuelist = QueueJob.get_jobs_by_name(name=name)
-    if len(queuelist) > 0:
-        return queuelist[0].job
-    else:
-        return None
+    queuelist = job_queue.get_jobs_by_name(name=name)
+    return queuelist[0].job if len(queuelist) > 0 else None
 
 async def start_buy_signals(update: Update, context: CallbackContext):
     """Start buy signals"""
-    # global pairList
-    # global get_buy_signals_active
     message = update.message if update.callback_query is None else update.callback_query.message
     chat_id = str(message.chat_id)
     msg = await message.reply_text("Start Checking buy signals")
+    job_queue = context.application.job_queue
     update_json(FILENAMEBUYSIGNALSACTIVE, chat_id, True)
     await start(update, context)
     base_coin = load_json(FILENAMEBASECOIN)
@@ -315,7 +309,7 @@ async def start_buy_signals(update: Update, context: CallbackContext):
         data = context.user_data
         data["message"] = msg
         data["update"] = update
-        QueueJob.run_once(generate_pair_list,1 , data=data)
+        job_queue.run_once(generate_pair_list,1 , data=data)
         updating_pair_list[chat_id] = True
     if chat_id in updating_pair_list and updating_pair_list[chat_id]:
         updating_text = "Updating pair list. Pleas wait till finished"
@@ -330,20 +324,19 @@ async def start_buy_signals(update: Update, context: CallbackContext):
     data["update"] = update
     data["message"] = message
     data["bot"] = context.bot
-    job_buy = get_job(chat_id)
+    job_buy = get_job(job_queue, chat_id)
     if job_buy is None:
-        QueueJob.run_repeating(get_buy_signals, 60, data=data, name=chat_id)
+        job_queue.run_repeating(get_buy_signals, 60, data=data, name=chat_id)
     else:
         job_buy.resume()
 
 async def stop_buy_signals(update: Update, context: CallbackContext):
     """Stop buy signals"""
-    # global get_buy_signals_active
     message = update.message if update.callback_query is None else update.callback_query.message
     chat_id = str(message.chat_id)
     update_json(FILENAMEBUYSIGNALSACTIVE, chat_id, False)
     await message.reply_text("Buy signals stopped")
-    job_buy = get_job(chat_id)
+    job_buy = get_job(context.application.job_queue, chat_id)
     if job_buy is not None:
         job_buy.pause()
     await start(update, context)
@@ -355,7 +348,7 @@ async def check_status(update: Update, context: CallbackContext):
     buy_signals_active = load_json(FILENAMEBUYSIGNALSACTIVE)
     buy_signals_active_chat_id = chat_id in buy_signals_active and \
         buy_signals_active[chat_id]
-    job_buy = get_job(chat_id)
+    job_buy = get_job(context.application.job_queue, chat_id)
     if job_buy is None:
         if not buy_signals_active_chat_id:
             await stop_buy_signals(update, context)
@@ -444,7 +437,8 @@ async def display_pair_list(update: Update, context: CallbackContext) -> None:
     pair_list = load_json(FILENAMEPAIRLIST)
     if chat_id not in pair_list.keys():
         await update_pair_list(update, context)
-        await message.reply_text(f"First select pairs with /{CMDPOLLPAIRLIST} and click again on /{CMDDISPLAYPAIRLIST}")
+        await message.reply_text(
+            f"First select pairs with /{CMDPOLLPAIRLIST} and click again on /{CMDDISPLAYPAIRLIST}")
     else:
         await message.reply_text("Pair list:\n* " + ("\n* ".join(sorted(pair_list[chat_id]))))
 
@@ -455,7 +449,6 @@ def split_with_numpy(array_list, chunk_size):
 
 async def poll_pair_list(update: Update, context: CallbackContext) -> None:
     """Poll pair list"""
-    # global pairList
     message = update.message if update.callback_query is None else update.callback_query.message
     chat_id = str(message.chat_id)
     base_coin = load_json(FILENAMEBASECOIN)
@@ -493,8 +486,6 @@ async def poll_pair_list(update: Update, context: CallbackContext) -> None:
 
 async def receive_poll_selection(update: Update, context: CallbackContext) -> None:
     """Receive poll selection"""
-    # global base_coin
-    # global pairList
     # the bot can receive closed poll updates we don't care about
     answer = update.poll_answer
     poll_id = answer.poll_id
@@ -527,7 +518,7 @@ async def update_pair_list(update: Update, context: CallbackContext):
     data = context.user_data
     data["message"] = message
     data["update"] = update
-    QueueJob.run_once(generate_pair_list, 1, data=data)
+    context.application.job_queue.run_once(generate_pair_list, 1, data=data)
     updating_pair_list[str(message.chat_id)] = True
 
 async def display_min_stockrsi(update: Update, context: CallbackContext) -> None:
@@ -589,11 +580,9 @@ async def start(update: Update, context: CallbackContext):
 
 def main():
     """"Main"""
-    global QueueJob
     secrets = dotenv_values(".env")
     token = secrets["TELEGRAM_TOKEN_SCANNER"]
     application = Application.builder().token(token).build()
-    QueueJob = application.job_queue
     command_dict = {
         CMD_START: start,
         CMD_START_BUY_SIGNALS: start_buy_signals,
