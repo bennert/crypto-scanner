@@ -126,6 +126,9 @@ async def retrieve_buy_signals(message, timeframe_minute, min_stoch_rsi_value):
     for pair in pair_list[chat_id]:
         if len(data) > 0 and pair in data:
             continue
+        ticker = exchange.fetch_ticker(pair)
+        quote_volume_m = ticker["quoteVolume"]/1000000
+
         bars = exchange.fetch_ohlcv(pair, timeframe=timeframe, limit=timeframe_day)
         data_frame = pd.DataFrame(
             bars[:-1], columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
@@ -189,6 +192,7 @@ async def retrieve_buy_signals(message, timeframe_minute, min_stoch_rsi_value):
             "pair": pair,
             "datetime": date_time, #df['timestamp'].iloc[-1],
             "close": data_frame['close'].iloc[-1],
+            "quote_volume_m": quote_volume_m,
             "change_day": change_day,
             "change_day_perc": change_day_perc,
             "high": data_frame['bb_bbh'].iloc[-1],
@@ -228,6 +232,7 @@ def get_message_content(item):
         message_content += f"Time: {date_time}\n======================\n"
     pair = item["pair"]
     close = item["close"]
+    quote_volume_m = item["quote_volume_m"]
     change_day = item["change_day"]
     change_day_perc = item["change_day_perc"]
     bb_buy = item["bbBuy"]
@@ -249,7 +254,7 @@ def get_message_content(item):
     macd_value = item["macdValue"]
     macd_signal = item["macdSignal"]
     macd_diff = item["macdDiff"]
-    message_content += f"Pair: {pair}\nChange day: {change_day:.2f} / {change_day_perc:.2f}%\n" + \
+    message_content += f"Pair: {pair} (Vol:{quote_volume_m:7.2f}M)\nChange day: {change_day:.2f} / {change_day_perc:.2f}%\n" + \
         f"<b>Buy signal: [{buy_signal}]</b>\n" \
         f"{'<b>' if stoch_rsi_buy else ''}" \
         f"StochRsi D: {stoch_rsi_d:.2f}% K: {stoch_rsi_k:.2f}%" \
@@ -274,7 +279,7 @@ async def get_buy_signals(context: CallbackContext):
     if chat_id not in min_stoch_rsi.keys():
         await poll_min_stockrsi(update, context)
     min_stoch_rsi_value = int(min_stoch_rsi[chat_id])
-    timeframe_range = [1, 3, 5]
+    timeframe_range = [3, 5]
     if chat_id not in prev_timefram_minute_list:
         prev_timefram_minute_list[chat_id] = dict([[x, ""] for x in timeframe_range])
     for timeframe_minute in prev_timefram_minute_list[chat_id]:
@@ -303,7 +308,7 @@ async def start_buy_signals(update: Update, context: CallbackContext):
         await stop_buy_signals(update, context)
         await poll_min_quote_volume(update, context)
         return
-    min_day_volume = int(min_quote_volume[chat_id])
+    min_day_volume = float(min_quote_volume[chat_id])/1000000
     pair_list = load_json(FILENAMEPAIRLIST)
     if chat_id not in pair_list.keys() or len(pair_list[chat_id]) == 0:
         data = context.user_data
@@ -319,7 +324,7 @@ async def start_buy_signals(update: Update, context: CallbackContext):
             msg.edit_text(updating_text)
     await msg.edit_text(
         "Checking buy signals of pairs:\n* " + ("\n* ".join(sorted(pair_list[chat_id]))) + \
-        f"\nwith minimum day volume of {min_day_volume:10,d} {base_coin[chat_id]}")
+        f"\nwith minimum day volume of {min_day_volume:7.0f}M {base_coin[chat_id]}")
     data = context.user_data
     data["update"] = update
     data["message"] = message
@@ -440,7 +445,16 @@ async def display_pair_list(update: Update, context: CallbackContext) -> None:
         await message.reply_text(
             f"First select pairs with /{CMDPOLLPAIRLIST} and click again on /{CMDDISPLAYPAIRLIST}")
     else:
-        await message.reply_text("Pair list:\n* " + ("\n* ".join(sorted(pair_list[chat_id]))))
+        min_quote_volume = load_json(FILENAMEMINQUOTEVOLUME)
+        min_day_volume = int(min_quote_volume[chat_id])
+        pair_list_with_volume = []
+        for coin_pair in pair_list[chat_id]:
+            ticker = exchange.fetch_ticker(coin_pair)
+            quote_volume = ticker["quoteVolume"]
+            if quote_volume > min_day_volume:
+                pair_list_with_volume.append(f"{quote_volume/1000000:7.2f}M => {coin_pair}")
+
+        await message.reply_text("Pair list:\n* " + ("\n* ".join(sorted(pair_list_with_volume))))
 
 def split_with_numpy(array_list, chunk_size):
     """Split array with numpy"""
