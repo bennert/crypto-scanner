@@ -254,7 +254,9 @@ def get_message_content(item):
     macd_value = item["macdValue"]
     macd_signal = item["macdSignal"]
     macd_diff = item["macdDiff"]
-    message_content += f"Pair: {pair} (Vol:{quote_volume_m:7.2f}M)\nChange day: {change_day:.2f} / {change_day_perc:.2f}%\n" + \
+    message_content += \
+        f"Pair: {pair} (Vol:{quote_volume_m:7.2f}M)\n" \
+        f"Change day: {change_day:.2f} / {change_day_perc:.2f}%\n" + \
         f"<b>Buy signal: [{buy_signal}]</b>\n" \
         f"{'<b>' if stoch_rsi_buy else ''}" \
         f"StochRsi D: {stoch_rsi_d:.2f}% K: {stoch_rsi_k:.2f}%" \
