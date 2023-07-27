@@ -68,4 +68,4 @@ jobs:
           push: true
           tags: bennert/crypto-scanner:version${{ steps.gitversion.outputs.assemblySemVer }}.${{ steps.gitversion.outputs.buildMetaDataPadded }}
           secrets: |
-            "TELEGRAM_TOKEN_SCANNER"=${{ secrets.TELEGRAM_TOKEN_SCANNER }}
+            "TELEGRAM_TOKEN_SCANNER=${{ secrets.TELEGRAM_TOKEN_SCANNER }}"
