@@ -596,7 +596,7 @@ async def start(update: Update, context: CallbackContext):
 
 def main():
     """"Main"""
-    secrets = dotenv_values(".env")
+    secrets = dotenv_values("secrets/.env")
     token = secrets["TELEGRAM_TOKEN_SCANNER"]
     application = Application.builder().token(token).build()
     command_dict = {
