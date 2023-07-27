@@ -33,6 +33,7 @@ CMDDISPLAYMINSTOCHRSI = "DisplayMinStochRsi"
 CMDPOLLMINSTOCHRSI = "PollMinStochRsi"
 
 exchange = ccxt.binance()
+FILENAMESECRETS = "./secrets/.env"
 FILENAMEBUYSIGNALSACTIVE = "./state/buysignalsactive.json"
 FILENAMEMINQUOTEVOLUME = "./state/minquotevol.json"
 FILENAMEBASECOIN = "./state/basecoin.json"
@@ -596,28 +597,31 @@ async def start(update: Update, context: CallbackContext):
 
 def main():
     """"Main"""
-    secrets = dotenv_values("secrets/.env")
-    token = secrets["TELEGRAM_TOKEN_SCANNER"]
-    application = Application.builder().token(token).build()
-    command_dict = {
-        CMD_START: start,
-        CMD_START_BUY_SIGNALS: start_buy_signals,
-        CMD_STOP_BUY_SIGNALS: stop_buy_signals,
-        CMD_CHECK_STATUS: check_status,
-        CMD_DISPLAY_MIN_QUOTE_VOLUME: display_min_quote_volume,
-        CMDDISPLAYBASECOIN: display_base_coin,
-        CMDDISPLAYPAIRLIST: display_pair_list,
-        CMDDISPLAYMINSTOCHRSI: display_min_stockrsi,
-        CMDPOLLMINQUOTEVOLUME: poll_min_quote_volume,
-        CMDPOLLBASECOIN: poll_base_coin,
-        CMDPOLLPAIRLIST : poll_pair_list,
-        CMDUPDATEPAIRLIST: update_pair_list,
-        CMDPOLLMINSTOCHRSI: poll_min_stockrsi
-    }
-    for command in command_dict:
-        application.add_handler(CommandHandler(command, command_dict[command]))
-    application.add_handler(PollAnswerHandler(receive_poll_selection))
-    application.run_polling(poll_interval=1.0, timeout=180)
+    if os.path.isfile(FILENAMESECRETS):
+        secrets = dotenv_values(FILENAMESECRETS)
+        token = secrets["TELEGRAM_TOKEN_SCANNER"]
+        application = Application.builder().token(token).build()
+        command_dict = {
+            CMD_START: start,
+            CMD_START_BUY_SIGNALS: start_buy_signals,
+            CMD_STOP_BUY_SIGNALS: stop_buy_signals,
+            CMD_CHECK_STATUS: check_status,
+            CMD_DISPLAY_MIN_QUOTE_VOLUME: display_min_quote_volume,
+            CMDDISPLAYBASECOIN: display_base_coin,
+            CMDDISPLAYPAIRLIST: display_pair_list,
+            CMDDISPLAYMINSTOCHRSI: display_min_stockrsi,
+            CMDPOLLMINQUOTEVOLUME: poll_min_quote_volume,
+            CMDPOLLBASECOIN: poll_base_coin,
+            CMDPOLLPAIRLIST : poll_pair_list,
+            CMDUPDATEPAIRLIST: update_pair_list,
+            CMDPOLLMINSTOCHRSI: poll_min_stockrsi
+        }
+        for command in command_dict:
+            application.add_handler(CommandHandler(command, command_dict[command]))
+        application.add_handler(PollAnswerHandler(receive_poll_selection))
+        application.run_polling(poll_interval=1.0, timeout=180)
+    else:
+        print(f"Missing secret file: {FILENAMESECRETS} with telegram token")
 
 if __name__ == '__main__':
     main()
