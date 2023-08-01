@@ -5,6 +5,10 @@ on:
     branches:
       - '*'
 
+env:
+  REGISTRY_IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/${{ github.event.repository.name }}
+  PLATFORMS: linux/amd64,linux/arm/v8
+      
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -65,5 +69,6 @@ jobs:
         with:
           context: .
           file: ./Dockerfile
+          platforms: ${{ env.PLATFORMS }}
           push: true
-          tags: bennert/crypto-scanner:version${{ steps.gitversion.outputs.assemblySemVer }}.${{ steps.gitversion.outputs.buildMetaDataPadded }}
+          tags: ${{ env.REGISTRY_IMAGE }}:latest,${{ env.REGISTRY_IMAGE }}:version${{ steps.gitversion.outputs.assemblySemVer }}.${{ steps.gitversion.outputs.buildMetaDataPadded }}
