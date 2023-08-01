@@ -7,7 +7,7 @@ on:
 
 env:
   REGISTRY_IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/${{ github.event.repository.name }}
-  PLATFORMS: linux/amd64,linux/arm/v8
+  PLATFORMS: linux/amd64
       
 jobs:
   build:
