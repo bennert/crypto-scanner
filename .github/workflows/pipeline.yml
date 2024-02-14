@@ -65,10 +65,10 @@ jobs:
           echo "UncommittedChanges: ${{ steps.gitversion.outputs.uncommittedChanges }}"
           echo "CommitDate: ${{ steps.gitversion.outputs.commitDate }}"
       - name: Build and Push Docker image
-        uses: docker/build-push-action@v4
+        uses: docker/build-push-action@v5
         with:
           context: .
           file: ./Dockerfile
-          platforms: ${{ env.PLATFORMS }}
+          platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ env.REGISTRY_IMAGE }}:latest,${{ env.REGISTRY_IMAGE }}:version${{ steps.gitversion.outputs.assemblySemVer }}.${{ steps.gitversion.outputs.buildMetaDataPadded }}
