@@ -1,14 +1,17 @@
+""" Telegram handling module """
 import time
 import numpy as np
 
 from dotenv import dotenv_values
-from file_handling import (file_exists, add_json, load_json, update_json, save_json,
-                            FILENAMEMINQUOTEVOLUME, FILENAMEBASECOIN, FILENAMEPAIRLIST, FILENAMEMINSTOCHRSI, FILENAMEBUYSIGNALSACTIVE)
-from exchange_handling import fetch_ticker, get_pair_list, retrieve_buy_signals, prev_timefram_minute_list
 from telegram import KeyboardButton, ReplyKeyboardMarkup, Update
 from telegram.constants import ParseMode
 from telegram.ext import (Application, CallbackContext, CommandHandler,
                           PollAnswerHandler)
+from file_handling import (file_exists, add_json, load_json, update_json, save_json,
+                            FILENAMEMINQUOTEVOLUME, FILENAMEBASECOIN, FILENAMEPAIRLIST,
+                            FILENAMEMINSTOCHRSI, FILENAMEBUYSIGNALSACTIVE)
+from exchange_handling import (fetch_ticker, get_pair_list, retrieve_buy_signals,
+                               prev_timefram_minute_list)
 
 FILENAMESECRETS = "./secrets/.env"
 
@@ -29,6 +32,7 @@ CMDPOLLMINSTOCHRSI = "PollMinStochRsi"
 updating_pair_list = {}
 
 def start_telegram_bot():
+    """Start telegram bot"""
     if file_exists(FILENAMESECRETS):
         secrets = dotenv_values(FILENAMESECRETS)
         token = secrets["TELEGRAM_TOKEN_SCANNER"]
@@ -48,8 +52,8 @@ def start_telegram_bot():
             CMDUPDATEPAIRLIST: update_pair_list,
             CMDPOLLMINSTOCHRSI: poll_min_stockrsi
         }
-        for command in command_dict:
-            application.add_handler(CommandHandler(command, command_dict[command]))
+        for command, handler in command_dict.items():
+            application.add_handler(CommandHandler(command, handler))
         application.add_handler(PollAnswerHandler(receive_poll_selection))
         application.run_polling(poll_interval=1.0, timeout=180)
     else:
@@ -117,6 +121,7 @@ def get_message_content(item):
     ]
     buy_signal_list = [x for x in buy_signal_list if x != '']
     buy_signal = ', '.join(buy_signal_list)
+    signal_emoji = "\U0001F7E2" if bb_buy else "\U0001F534"
     high = item["high"]
     low = item["low"]
     bb_width = item["bbWidth"]
@@ -129,7 +134,7 @@ def get_message_content(item):
     message_content += \
         f"Pair: {pair} (Vol:{quote_volume_m:7.2f}M)\n" \
         f"Change day: {change_day:.2f} / {change_day_perc:.2f}%\n" + \
-        f"<b>Buy signal: [{buy_signal}]</b>\n" \
+        f"{signal_emoji}<b>Buy signal: [{buy_signal}]</b>\n" \
         f"{'<b>' if stoch_rsi_buy else ''}" \
         f"StochRsi D: {stoch_rsi_d:.2f}% K: {stoch_rsi_k:.2f}%" \
         f"{'</b>' if stoch_rsi_buy else ''}\n" \
@@ -143,16 +148,22 @@ def get_message_content(item):
         f"Close: {close:.5f}\n\n"
     return message_content
 
-async def retrieve_all_buy_signals(chat_id, timeframe_range, message, pair_list, min_stoch_rsi_value):
+async def retrieve_all_buy_signals(
+        chat_id, timeframe_range, message, pair_list, min_stoch_rsi_value):
+    """Retrieve all buy signals"""
     if chat_id not in prev_timefram_minute_list:
         prev_timefram_minute_list[chat_id] = dict([[x, ""] for x in timeframe_range])
     for timeframe_minute in prev_timefram_minute_list[chat_id]:
-        buy_list = await retrieve_buy_signals(message, timeframe_minute, pair_list, min_stoch_rsi_value)
+        buy_list = await retrieve_buy_signals(
+            message, timeframe_minute, pair_list, min_stoch_rsi_value)
         if len(buy_list) > 0:
             await message.reply_text(
-                f"<b><u>Buy signals ({timeframe_minute} minutes):</u></b>", parse_mode=ParseMode.HTML)
+                f"<b><u>Buy signals ({timeframe_minute} minutes):</u></b>",
+                parse_mode=ParseMode.HTML)
             for i in buy_list:
-                await message.reply_text(get_message_content(buy_list[i]), parse_mode=ParseMode.HTML)
+                await message.reply_text(
+                    get_message_content(buy_list[i]),
+                    parse_mode=ParseMode.HTML)
 
 async def get_buy_signals(context: CallbackContext):
     """Get buy signals"""
@@ -166,7 +177,8 @@ async def get_buy_signals(context: CallbackContext):
     min_stoch_rsi_value = int(min_stoch_rsi[chat_id])
     timeframe_range = [3, 5]
     pair_list = load_json(FILENAMEPAIRLIST)
-    await retrieve_all_buy_signals(chat_id, timeframe_range, message, pair_list, min_stoch_rsi_value)
+    await retrieve_all_buy_signals(
+        chat_id, timeframe_range, message, pair_list, min_stoch_rsi_value)
 
 async def generate_pair_list(context: CallbackContext):
     """Generate pair list"""
@@ -461,4 +473,3 @@ async def poll_min_stockrsi(update: Update, context: CallbackContext) -> None:
         }
     }
     context.bot_data.update(payload)
-
