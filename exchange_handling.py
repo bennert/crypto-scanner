@@ -1,16 +1,27 @@
+"""Exchange handling"""
+from datetime import datetime
 import ccxt
 import pandas as pd
 import pytz
 
-from datetime import datetime
-from ta.momentum import RSIIndicator, StochRSIIndicator
+from ta.momentum import RSIIndicator, StochRSIIndicator, StochasticOscillator
 from ta.trend import MACD
 from ta.volatility import BollingerBands
 from telegram.error import TimedOut
 
-exchange = ccxt.binance()
 dataList = {}
 prev_timefram_minute_list = {}
+
+exchange = None
+
+def set_exchange(exchange_name):
+    """Set exchange"""
+    global exchange
+    if exchange_name in ccxt.exchanges:
+        exchange_class = getattr(ccxt, exchange_name)
+        exchange = exchange_class()
+    else:
+        exchange = ccxt.binance()
 
 async def get_pair_list(base_coin, min_day_volume, message, heading):
     """Get pair list"""
@@ -65,6 +76,9 @@ async def retrieve_buy_signals(message, timeframe_minute, pair_list, min_stoch_r
                 data = copy_data(pair_list, timeframe_minute, date_time)
             prev_timefram_minute_list[chat_id][timeframe_minute] = date_time
         indicator_bb = BollingerBands(close=data_frame["close"], window=20, window_dev=2)
+        indicator_stoch = StochasticOscillator(
+            close=data_frame["close"], high=data_frame["high"], low=data_frame["low"], window=14,
+            smooth_window=3)
         indicator_stoch_rsi = StochRSIIndicator(
             close=data_frame["close"], window=14, smooth1=3, smooth2=3)
         indicator_rsi = RSIIndicator(close=data_frame["close"], window=14)
@@ -87,6 +101,17 @@ async def retrieve_buy_signals(message, timeframe_minute, pair_list, min_stoch_r
         data_frame['bb_bbli'] = indicator_bb.bollinger_lband_indicator()
         bb_buy = bool(data_frame['bb_bbli'].iloc[-1])
         bb_sell = bool(data_frame['bb_bbhi'].iloc[-1])
+
+        data_frame['stoch_signal'] = indicator_stoch.stoch_signal()
+        data_frame['stoch'] = indicator_stoch.stoch()
+        stoch_max = 80
+        stoch_min = 20
+        stoch_buy = \
+            data_frame['stoch_signal'].iloc[-1] < stoch_min and \
+            data_frame['stoch'].iloc[-1] < stoch_min
+        stoch_sell = \
+            data_frame['stoch_signal'].iloc[-1] > stoch_max and \
+            data_frame['stoch'].iloc[-1] > stoch_max
 
         data_frame['stochRsiD'] = indicator_stoch_rsi.stochrsi_d() * 100
         data_frame['stochRsiK'] = indicator_stoch_rsi.stochrsi_k() * 100
@@ -119,6 +144,8 @@ async def retrieve_buy_signals(message, timeframe_minute, pair_list, min_stoch_r
             "high": data_frame['bb_bbh'].iloc[-1],
             "low": data_frame['bb_bbl'].iloc[-1],
             "bbWidth": data_frame['bb_width'].iloc[-1],
+            "stochD": data_frame['stoch_signal'].iloc[-1],
+            "stochK": data_frame['stoch'].iloc[-1],
             "stochRsiD": data_frame['stochRsiD'].iloc[-1],
             "stochRsiK": data_frame['stochRsiK'].iloc[-1],
             "rsi": data_frame['rsi'].iloc[-1],
@@ -126,18 +153,20 @@ async def retrieve_buy_signals(message, timeframe_minute, pair_list, min_stoch_r
             "macdSignal": data_frame['macdSignal'].iloc[-1],
             "macdDiff": data_frame['macdDiff'].iloc[-1],
             "bbBuy": bb_buy,
+            "stochBuy": stoch_buy,
             "stochRsiBuy": stoch_rsi_buy,
             "rsiBuy": rsi_buy,
             "bbSell": bb_sell,
+            "stochSell": stoch_sell,
             "stochRsiSell": stoch_rsi_sell,
             "rsiSell": rsi_sell
         }
-    buy_list = {}
-    for i in data:
-        if bool(data[i]["bbBuy"]) and \
-            bool(data[i]["stochRsiBuy"]):
-            buy_list[i] = data[i]
+
+    buy_list = {
+        i: data[i] for i in data if data[i]["bbBuy"] and data[i]["stochRsiBuy"]
+    }
     return buy_list
 
 def fetch_ticker(pair):
+    """Fetch ticker"""
     return exchange.fetch_ticker(pair)

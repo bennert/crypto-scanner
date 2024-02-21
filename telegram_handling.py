@@ -10,7 +10,7 @@ from telegram.ext import (Application, CallbackContext, CommandHandler,
 from file_handling import (file_exists, add_json, load_json, update_json, save_json,
                             FILENAMEMINQUOTEVOLUME, FILENAMEBASECOIN, FILENAMEPAIRLIST,
                             FILENAMEMINSTOCHRSI, FILENAMEBUYSIGNALSACTIVE)
-from exchange_handling import (fetch_ticker, get_pair_list, retrieve_buy_signals,
+from exchange_handling import (set_exchange, fetch_ticker, get_pair_list, retrieve_buy_signals,
                                prev_timefram_minute_list)
 
 FILENAMESECRETS = "./secrets/.env"
@@ -37,21 +37,6 @@ def start_telegram_bot():
         secrets = dotenv_values(FILENAMESECRETS)
         token = secrets["TELEGRAM_TOKEN_SCANNER"]
         application = Application.builder().token(token).build()
-        command_dict = {
-            CMD_START: start,
-            CMD_START_BUY_SIGNALS: start_buy_signals,
-            CMD_STOP_BUY_SIGNALS: stop_buy_signals,
-            CMD_CHECK_STATUS: check_status,
-            CMD_DISPLAY_MIN_QUOTE_VOLUME: display_min_quote_volume,
-            CMDDISPLAYBASECOIN: display_base_coin,
-            CMDDISPLAYPAIRLIST: display_pair_list,
-            CMDDISPLAYMINSTOCHRSI: display_min_stockrsi,
-            CMDPOLLMINQUOTEVOLUME: poll_min_quote_volume,
-            CMDPOLLBASECOIN: poll_base_coin,
-            CMDPOLLPAIRLIST : poll_pair_list,
-            CMDUPDATEPAIRLIST: update_pair_list,
-            CMDPOLLMINSTOCHRSI: poll_min_stockrsi
-        }
         for command, handler in command_dict.items():
             application.add_handler(CommandHandler(command, handler))
         application.add_handler(PollAnswerHandler(receive_poll_selection))
@@ -112,6 +97,7 @@ def get_message_content(item):
     change_day = item["change_day"]
     change_day_perc = item["change_day_perc"]
     bb_buy = item["bbBuy"]
+    stoch_buy = item["stochBuy"]
     stoch_rsi_buy = item["stochRsiBuy"]
     rsi_buy = item["rsiBuy"]
     buy_signal_list = [
@@ -125,6 +111,8 @@ def get_message_content(item):
     high = item["high"]
     low = item["low"]
     bb_width = item["bbWidth"]
+    stoch_k = item["stochK"]
+    stoch_d = item["stochD"]
     stoch_rsi_d = item["stochRsiD"]
     stoch_rsi_k = item["stochRsiK"]
     rsi = item["rsi"]
@@ -135,6 +123,9 @@ def get_message_content(item):
         f"Pair: {pair} (Vol:{quote_volume_m:7.2f}M)\n" \
         f"Change day: {change_day:.2f} / {change_day_perc:.2f}%\n" + \
         f"{signal_emoji}<b>Buy signal: [{buy_signal}]</b>\n" \
+        f"{'<b>' if stoch_buy else ''}" \
+        f"Stoch D: {stoch_d:.2f} K: {stoch_k:.2f}\n" \
+        f"{'</b>' if stoch_buy else ''}" \
         f"{'<b>' if stoch_rsi_buy else ''}" \
         f"StochRsi D: {stoch_rsi_d:.2f}% K: {stoch_rsi_k:.2f}%" \
         f"{'</b>' if stoch_rsi_buy else ''}\n" \
@@ -197,6 +188,7 @@ async def generate_pair_list(context: CallbackContext):
     job_buy = get_job(context.application.job_queue, chat_id)
     if job_buy is not None:
         job_buy.pause()
+    set_exchange("kucoin")
     valid_coin_pairs = await get_pair_list(base_coin[chat_id], min_day_volume, msg, heading)
     update_json(FILENAMEPAIRLIST, chat_id, valid_coin_pairs)
 
@@ -210,6 +202,7 @@ async def generate_pair_list(context: CallbackContext):
 # pylint: disable=unused-argument
 async def start(update: Update, context: CallbackContext):
     """Start"""
+    set_exchange("kucoin")
     message = update.effective_message
     chat_id = str(update.effective_user.id)
     buy_signals_active = load_json(FILENAMEBUYSIGNALSACTIVE)
@@ -363,7 +356,8 @@ async def poll_min_quote_volume(update: Update, context: CallbackContext) -> Non
     quote_volumes = [
         "500000000",
         "100000000",
-        "50000000"
+        "50000000",
+        "10000000"
     ]
     message = await context.bot.send_poll(
         update.effective_chat.id,
@@ -473,3 +467,19 @@ async def poll_min_stockrsi(update: Update, context: CallbackContext) -> None:
         }
     }
     context.bot_data.update(payload)
+
+command_dict = {
+    CMD_START: start,
+    CMD_START_BUY_SIGNALS: start_buy_signals,
+    CMD_STOP_BUY_SIGNALS: stop_buy_signals,
+    CMD_CHECK_STATUS: check_status,
+    CMD_DISPLAY_MIN_QUOTE_VOLUME: display_min_quote_volume,
+    CMDDISPLAYBASECOIN: display_base_coin,
+    CMDDISPLAYPAIRLIST: display_pair_list,
+    CMDDISPLAYMINSTOCHRSI: display_min_stockrsi,
+    CMDPOLLMINQUOTEVOLUME: poll_min_quote_volume,
+    CMDPOLLBASECOIN: poll_base_coin,
+    CMDPOLLPAIRLIST : poll_pair_list,
+    CMDUPDATEPAIRLIST: update_pair_list,
+    CMDPOLLMINSTOCHRSI: poll_min_stockrsi
+}
