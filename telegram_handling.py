@@ -32,9 +32,18 @@ CMDPOLLMINSTOCHRSI = "PollMinStochRsi"
 updating_pair_list = {}
 
 emoji_type = {
-    "Buy": "\U0001F7E2",
-    "Sell": "\U0001F534",
-    "None": "\U0001F7E2"
+    "Buy": "\U0001F7E2",  # Green circle
+    "Sell": "\U0001F534", # Red   circle
+    "None": "\U0001F7E2"  # Green circle
+}
+
+emoji_momentum_level = {
+    range(0, 10):   "\U0001F7E9",  # Green square
+    range(11, 20):  "\U0001F7EA",  # Purple square
+    range(21, 50):  "\U0001F7E6",  # Blue square
+    range(51, 81):  "\U0001F7E8",  # Yellow square
+    range(80, 91):  "\U0001F7E7",  # Orange square
+    range(90, 100): "\U0001F7E5",  # Red square
 }
 
 def start_telegram_bot():
@@ -89,14 +98,14 @@ async def receive_poll_selection(update: Update, context: CallbackContext) -> No
     quiz_data = context.bot_data[poll_id]
     await context.bot.stop_poll(quiz_data["chat_id"], quiz_data["message_id"])
 
-def get_message_content(item, timeframe_minute):
+def get_message_content(item, timeframe_minute, base_coin):
     """Compose content of message"""
     message_content = ""
     previour_date_time = ""
     date_time = item["datetime"]
     if previour_date_time != date_time:
         previour_date_time = date_time
-        message_content += f"Time: {date_time}\n======================\n"
+        message_content += f"Time: {date_time.strftime('%Y %m %d %H%M')}\n"
     pair = item["pair"]
     close = item["close"]
     quote_volume_m = item["quote_volume_m"]
@@ -109,7 +118,7 @@ def get_message_content(item, timeframe_minute):
     stoch_signal = item["stochBuy"] or item["stochSell"]
     stoch_rsi_signal = item["stochRsiBuy"] or item["stochRsiSell"]
     rsi_signal = item["rsiBuy"] or item["rsiSell"]
-    
+
     bb_buy = item["bbBuy"]
     stoch_buy = item["stochBuy"]
     stoch_rsi_buy = item["stochRsiBuy"]
@@ -121,13 +130,13 @@ def get_message_content(item, timeframe_minute):
     rsi_sell = item["rsiSell"]
 
     signal_list["Buy"] = [
-        "BB " if bb_buy else '',
+        "BB" if bb_buy else '',
         "Stoch" if stoch_buy else '',
         "StochRsi" if stoch_rsi_buy else '',
         "RSI" if rsi_buy else ''
     ]
     signal_list["Sell"] = [
-        "BB " if bb_sell else '',
+        "BB" if bb_sell else '',
         "Stoch" if stoch_sell else '',
         "StochRsi" if stoch_rsi_sell else '',
         "RSI" if rsi_sell else ''
@@ -148,31 +157,42 @@ def get_message_content(item, timeframe_minute):
     stoch_rsi_d = item["stochRsiD"]
     stoch_rsi_k = item["stochRsiK"]
     rsi = item["rsi"]
+    # Calculate momentum strength by using combination of stoch and rsi
+    momentum_strength = int(0.25 * stoch_k + 0.25 * stoch_d + 0.5 * rsi)
+
     macd_value = item["macdValue"]
-    macd_signal = item["macdSignal"]
-    macd_diff = item["macdDiff"]
+    macd_signal = item.get("macdSignal", 0)
+    macd_diff = item.get("macdDiff", 0)
+    momentum_emoji = ""
+    for key, val in emoji_momentum_level.items():
+        if momentum_strength in key:
+            momentum_emoji = val
     message_content += \
-        f"{signal_emoji} {pair} / {timeframe_minute} min / <b>[{signal[signal_type]}]</b>\n" \
-        f"Change day: {change_day:.2f} / {change_day_perc:.2f}% / {quote_volume_m:7.2f}M\n" + \
-        f"{'<b>' if bb_signal else ''}" \
-        f"BB H/L/W: {high:.5f} / {low:.5f} / {bb_width:.2f}%" \
-        f"{'</b>' if bb_signal else ''}\n" \
-        f"{'<b>' if stoch_signal else ''}" \
+        f"{momentum_emoji} {signal_emoji} {pair} | " +\
+            f"{timeframe_minute} min | *[{signal[signal_type]}]*\n" \
+        f"Change day: {change_day:.2f} | {change_day_perc:.2f}% | " + \
+        f"{quote_volume_m:7.2f}M {base_coin}\n" + \
+        f"{'*' if bb_signal else ''}" \
+        f"BB H|L|W: {high:.5f} | {low:.5f} | {bb_width:.2f}%" \
+        f"{'*' if bb_signal else ''}\n" \
+        f"{'*' if stoch_signal else ''}" \
         f"Stoch D: {stoch_d:.2f}% K: {stoch_k:.2f}%\n" \
-        f"{'</b>' if stoch_signal else ''}" \
-        f"{'<b>' if stoch_rsi_signal else ''}" \
+        f"{'*' if stoch_signal else ''}" \
+        f"{'*' if stoch_rsi_signal else ''}" \
         f"StochRsi D: {stoch_rsi_d:.2f}% K: {stoch_rsi_k:.2f}%" \
-        f"{'</b>' if stoch_rsi_signal else ''}\n" \
-        f"{'<b>' if rsi_signal else ''}" \
+        f"{'*' if stoch_rsi_signal else ''}\n" \
+        f"{'*' if rsi_signal else ''}" \
         f"RSI: {rsi:.2f}%" \
-        f"{'</b>' if rsi_signal else ''}\n" \
+        f"{'*' if rsi_signal else ''}\n" \
         f"MACD: {macd_value:.3f} Signal: {macd_signal:.3f} Histogram: {macd_diff:.3f}\n" \
         f"Close: {close:.5f}\n\n"
-    return message_content
+    return message_content.replace(".", r"\.").replace("|", r"\|").replace("-", r"\-") \
+        .replace("{", r"\{").replace("}", r"\}")
 
 async def retrieve_all_signals(
         chat_id, timeframe_range, message, pair_list, min_stoch_rsi_value):
-    """Retrieve all buy signals"""
+    """Retrieve all signals"""
+    base_coin = load_json(FILENAMEBASECOIN)
     if chat_id not in prev_timefram_minute_list:
         prev_timefram_minute_list[chat_id] = dict([[x, ""] for x in timeframe_range])
     for timeframe_minute in prev_timefram_minute_list[chat_id]:
@@ -182,15 +202,17 @@ async def retrieve_all_signals(
             signal_type_list = signal_list[signal_type]
             if len(signal_type_list) > 0:
                 await message.reply_text(
-                    f"{emoji_type[signal_type]}<b><u>{signal_type} signals ({timeframe_minute} minutes):</u></b>",
-                    parse_mode=ParseMode.HTML)
+                    f"{emoji_type[signal_type]} *{signal_type} signals " + \
+                    f"{timeframe_minute} minutes:*",
+                    parse_mode=ParseMode.MARKDOWN_V2)
                 for i in signal_type_list:
                     await message.reply_text(
-                        get_message_content(signal_type_list[i], timeframe_minute),
-                        parse_mode=ParseMode.HTML)
+                        get_message_content(
+                            signal_type_list[i], timeframe_minute, base_coin[chat_id]),
+                        parse_mode=ParseMode.MARKDOWN_V2)
 
 async def get_signals(context: CallbackContext):
-    """Get buy signals"""
+    """Get signals"""
     job = context.job
     message = job.data["message"]
     update = job.data["update"]
@@ -259,10 +281,10 @@ async def start(update: Update, context: CallbackContext):
     await message.reply_text("Choose action:", reply_markup=reply_markup)
 
 async def start_signals(update: Update, context: CallbackContext):
-    """Start buy signals"""
+    """Start signals"""
     message = update.message if update.callback_query is None else update.callback_query.message
     chat_id = str(message.chat_id)
-    msg = await message.reply_text("Start Checking buy signals")
+    msg = await message.reply_text("Start Checking signals")
     job_queue = context.application.job_queue
     update_json(FILENAMEBUYSIGNALSACTIVE, chat_id, True)
     await start(update, context)
@@ -291,7 +313,7 @@ async def start_signals(update: Update, context: CallbackContext):
             updating_text += "."
             msg.edit_text(updating_text)
     await msg.edit_text(
-        "Checking buy signals of pairs:\n* " + ("\n* ".join(sorted(pair_list[chat_id]))) + \
+        "Checking signals of pairs:\n* " + ("\n* ".join(sorted(pair_list[chat_id]))) + \
         f"\nwith minimum day volume of {min_day_volume:7.0f}M {base_coin[chat_id]}")
     data = context.user_data
     data["update"] = update
@@ -304,11 +326,11 @@ async def start_signals(update: Update, context: CallbackContext):
         job_buy.resume()
 
 async def stop_signals(update: Update, context: CallbackContext):
-    """Stop buy signals"""
+    """Stop signals"""
     message = update.message if update.callback_query is None else update.callback_query.message
     chat_id = str(message.chat_id)
     update_json(FILENAMEBUYSIGNALSACTIVE, chat_id, False)
-    await message.reply_text("Buy signals stopped")
+    await message.reply_text("Signals stopped")
     job_buy = get_job(context.application.job_queue, chat_id)
     if job_buy is not None:
         job_buy.pause()
@@ -328,7 +350,7 @@ async def check_status(update: Update, context: CallbackContext):
         else:
             await start_signals(update, context)
     await message.reply_text(
-        "Scanner is " + ("" if signals_active_chat_id else "NOT ") + "checking buy signals")
+        "Scanner is " + ("" if signals_active_chat_id else "NOT ") + "checking signals")
 
 async def display_min_quote_volume(update: Update, context: CallbackContext) -> None:
     """Display minimum quote volume"""
