@@ -48,8 +48,8 @@ def copy_data(pair_list, timeframe_minute, date_time):
             data[pair_from_list] = dataList[timeframe_minute][date_time]
     return data
 
-async def retrieve_buy_signals(message, timeframe_minute, pair_list, min_stoch_rsi_value):
-    """Retrieve buy signals"""
+async def retrieve_signals(message, timeframe_minute, pair_list, min_stoch_rsi_value):
+    """Retrieve buy and sell signals"""
     chat_id = str(message.chat_id)
     timeframe_hour = 60 / timeframe_minute
     timeframe_day = int(24 * timeframe_hour)
@@ -165,7 +165,14 @@ async def retrieve_buy_signals(message, timeframe_minute, pair_list, min_stoch_r
     buy_list = {
         i: data[i] for i in data if data[i]["bbBuy"] and data[i]["stochRsiBuy"]
     }
-    return buy_list
+    sell_list = {
+        i: data[i] for i in data if data[i]["bbSell"] and data[i]["stochRsiSell"]
+    }
+    signal_list = {
+        "Buy": buy_list,
+        "Sell": sell_list
+    }
+    return signal_list
 
 def fetch_ticker(pair):
     """Fetch ticker"""
