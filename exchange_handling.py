@@ -48,7 +48,8 @@ def copy_data(pair_list, timeframe_minute, date_time):
             data[pair_from_list] = dataList[timeframe_minute][date_time]
     return data
 
-async def retrieve_signals(message, timeframe_minute, pair_list, min_stoch_rsi_value):
+async def retrieve_signals(
+        message, timeframe_minute, pair_list, min_stoch_rsi_value, indicator_trigger_list):
     """Retrieve buy and sell signals"""
     chat_id = str(message.chat_id)
     timeframe_hour = 60 / timeframe_minute
@@ -162,12 +163,30 @@ async def retrieve_signals(message, timeframe_minute, pair_list, min_stoch_rsi_v
             "rsiSell": rsi_sell
         }
 
-    buy_list = {
-        i: data[i] for i in data if data[i]["bbBuy"] and data[i]["stochRsiBuy"]
-    }
-    sell_list = {
-        i: data[i] for i in data if data[i]["bbSell"] and data[i]["stochRsiSell"]
-    }
+    buy_list = []
+    for _, value in data.items():
+        buy = True
+        for indicator in indicator_trigger_list:
+            index = f"{indicator}Buy"
+            assert index in value, f"Index {index} not in item {value}"
+            if not value[index]:
+                buy = False
+                continue
+        if buy:
+            buy_list.append(value)
+    sell_list = []
+
+    for _, value in data.items():
+        sell = True
+        for indicator in indicator_trigger_list:
+            index = f"{indicator}Sell"
+            assert index in value, f"Index {index} not in item {value}"
+            if not value[index]:
+                sell = False
+                continue
+        if sell:
+            sell_list.append(value)
+
     signal_list = {
         "Buy": buy_list,
         "Sell": sell_list

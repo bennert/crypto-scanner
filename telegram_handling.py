@@ -9,7 +9,7 @@ from telegram.ext import (Application, CallbackContext, CommandHandler,
                           PollAnswerHandler)
 from file_handling import (file_exists, add_json, load_json, update_json, save_json,
                             FILENAMEMINQUOTEVOLUME, FILENAMEBASECOIN, FILENAMEPAIRLIST,
-                            FILENAMEMINSTOCHRSI, FILENAMEBUYSIGNALSACTIVE)
+                            FILENAMEMINSTOCHRSI, FILENAMEBUYSIGNALSACTIVE, FILENAMEINDICATORTRIGGER)
 from exchange_handling import (set_exchange, fetch_ticker, get_pair_list, retrieve_signals,
                                prev_timefram_minute_list)
 
@@ -19,15 +19,22 @@ CMD_START = "Start"
 CMD_START_SIGNALS = "StartSignals"
 CMD_STOP_SIGNALS = "StopSignals"
 CMD_CHECK_STATUS = "CheckStatus"
+
 CMD_DISPLAY_MIN_QUOTE_VOLUME = "DisplayMinQuoteVolume"
 CMDPOLLMINQUOTEVOLUME = "PollMinQuoteVolume"
+
 CMDDISPLAYBASECOIN = "DisplayBaseCoin"
 CMDPOLLBASECOIN = "PollBaseCoin"
+
 CMDDISPLAYPAIRLIST = "DisplayPairList"
 CMDPOLLPAIRLIST = "PollPairList"
 CMDUPDATEPAIRLIST = "UpdatePairList"
+
 CMDDISPLAYMINSTOCHRSI = "DisplayMinStochRsi"
 CMDPOLLMINSTOCHRSI = "PollMinStochRsi"
+
+CMDDISPLAYINDICATORTRIGGER = "DisplayIndicatorTrigger"
+CMDPOLLINDICATORTRIGGER = "PollIndicatorTrigger"
 
 updating_pair_list = {}
 
@@ -39,11 +46,12 @@ emoji_type = {
 
 emoji_momentum_level = {
     range(0, 10):   "\U0001F7E9",  # Green square
-    range(11, 20):  "\U0001F7EA",  # Purple square
-    range(21, 50):  "\U0001F7E6",  # Blue square
-    range(51, 81):  "\U0001F7E8",  # Yellow square
-    range(80, 91):  "\U0001F7E7",  # Orange square
-    range(90, 100): "\U0001F7E5",  # Red square
+    range(10, 20):  "\U0001F7EA",  # Purple square
+    range(20, 30):  "\U0001F7E6",  # Blue square
+    range(30, 70):  "\U0001F533",  # White square
+    range(70, 80):  "\U0001F7E8",  # Yellow square
+    range(80, 90):  "\U0001F7E7",  # Orange square
+    range(90, 101): "\U0001F7E5",  # Red square
 }
 
 def start_telegram_bot():
@@ -82,6 +90,7 @@ async def receive_poll_selection(update: Update, context: CallbackContext) -> No
     except KeyError:
         return
     poll = context.bot_data[poll_id]["poll"]
+
     if poll == CMDPOLLMINQUOTEVOLUME:
         update_json(FILENAMEMINQUOTEVOLUME, chat_id, questions[answer.option_ids[0]])
     elif poll == CMDPOLLBASECOIN:
@@ -95,6 +104,12 @@ async def receive_poll_selection(update: Update, context: CallbackContext) -> No
         add_json(FILENAMEPAIRLIST, chat_id, valid_coin_pairs)
     elif poll == CMDPOLLMINSTOCHRSI:
         update_json(FILENAMEMINSTOCHRSI, chat_id, questions[answer.option_ids[0]])
+    elif poll == CMDPOLLINDICATORTRIGGER:
+        indicator_trigger_list = []
+        selected_options = answer.option_ids
+        for question_id in selected_options:
+            indicator_trigger_list.append(questions[question_id])
+        update_json(FILENAMEINDICATORTRIGGER, chat_id, indicator_trigger_list)
     quiz_data = context.bot_data[poll_id]
     await context.bot.stop_poll(quiz_data["chat_id"], quiz_data["message_id"])
 
@@ -168,7 +183,7 @@ def get_message_content(item, timeframe_minute, base_coin):
         if momentum_strength in key:
             momentum_emoji = val
     message_content += \
-        f"{momentum_emoji} {signal_emoji} {pair} | " +\
+        f"{momentum_emoji} {momentum_strength}% {signal_emoji} {pair} | " +\
             f"{timeframe_minute} min | *[{signal[signal_type]}]*\n" \
         f"Change day: {change_day:.2f} | {change_day_perc:.2f}% | " + \
         f"{quote_volume_m:7.2f}M {base_coin}\n" + \
@@ -193,22 +208,25 @@ async def retrieve_all_signals(
         chat_id, timeframe_range, message, pair_list, min_stoch_rsi_value):
     """Retrieve all signals"""
     base_coin = load_json(FILENAMEBASECOIN)
+    indicator_trigger = load_json(FILENAMEINDICATORTRIGGER)
     if chat_id not in prev_timefram_minute_list:
         prev_timefram_minute_list[chat_id] = dict([[x, ""] for x in timeframe_range])
     for timeframe_minute in prev_timefram_minute_list[chat_id]:
         signal_list = await retrieve_signals(
-            message, timeframe_minute, pair_list, min_stoch_rsi_value)
+            message, timeframe_minute, pair_list, min_stoch_rsi_value, indicator_trigger[chat_id])
         for signal_type in ["Buy", "Sell"]:
+            if signal_type not in signal_list:
+                continue
             signal_type_list = signal_list[signal_type]
             if len(signal_type_list) > 0:
                 await message.reply_text(
                     f"{emoji_type[signal_type]} *{signal_type} signals " + \
                     f"{timeframe_minute} minutes:*",
                     parse_mode=ParseMode.MARKDOWN_V2)
-                for i in signal_type_list:
+                for signal_list in signal_type_list:
                     await message.reply_text(
                         get_message_content(
-                            signal_type_list[i], timeframe_minute, base_coin[chat_id]),
+                            signal_list, timeframe_minute, base_coin[chat_id]),
                         parse_mode=ParseMode.MARKDOWN_V2)
 
 async def get_signals(context: CallbackContext):
@@ -252,7 +270,6 @@ async def generate_pair_list(context: CallbackContext):
     if job_buy is not None:
         job_buy.resume()
 
-
 # Command methods
 # pylint: disable=unused-argument
 async def start(update: Update, context: CallbackContext):
@@ -270,11 +287,13 @@ async def start(update: Update, context: CallbackContext):
         CMDDISPLAYBASECOIN,
         CMDDISPLAYPAIRLIST,
         CMDDISPLAYMINSTOCHRSI,
+        CMDDISPLAYINDICATORTRIGGER,
         CMDPOLLMINQUOTEVOLUME,
         CMDPOLLBASECOIN,
         CMDPOLLPAIRLIST,
         CMDUPDATEPAIRLIST,
-        CMDPOLLMINSTOCHRSI
+        CMDPOLLMINSTOCHRSI,
+        CMDPOLLINDICATORTRIGGER
     ]
     keyboard = [[KeyboardButton("/" + menu_item)] for menu_item in menu_list]
     reply_markup = ReplyKeyboardMarkup(keyboard)
@@ -406,6 +425,16 @@ async def display_min_stockrsi(update: Update, context: CallbackContext) -> None
     else:
         await poll_min_stockrsi(update, context)
 
+async def display_indicator_trigger(update: Update, context: CallbackContext) -> None:
+    """Display indicator trigger"""
+    message = update.message if update.callback_query is None else update.callback_query.message
+    chat_id = str(message.chat_id)
+    indicator_trigger = load_json(FILENAMEINDICATORTRIGGER)
+    if chat_id in indicator_trigger.keys():
+        await message.reply_text("Indicator Trigger: " + ", ".join(indicator_trigger[chat_id]))
+    else:
+        await poll_indicator_trigger(update, context)
+
 async def poll_min_quote_volume(update: Update, context: CallbackContext) -> None:
     """"Poll minimum quote volume"""
     quote_volumes = [
@@ -523,6 +552,27 @@ async def poll_min_stockrsi(update: Update, context: CallbackContext) -> None:
     }
     context.bot_data.update(payload)
 
+async def poll_indicator_trigger(update: Update, context: CallbackContext) -> None:
+    """Poll indicator trigger"""
+    indicator_values = [ "bb", "stoch", "stochRsi", "rsi"]
+    message = await context.bot.send_poll(
+        update.effective_chat.id,
+        "Select indicator to trigger", 
+        indicator_values,
+        is_anonymous=False,
+        allows_multiple_answers=True
+    )
+    payload = {# Save some info about the poll the bot_data for later use in receive_quiz_answer
+        message.poll.id: {
+            "poll": CMDPOLLINDICATORTRIGGER,
+            "questions": indicator_values,
+            "chat_id": update.effective_chat.id,
+            "message_id": message.message_id,
+            "answers": 0
+        }
+    }
+    context.bot_data.update(payload)
+
 command_dict = {
     CMD_START: start,
     CMD_START_SIGNALS: start_signals,
@@ -532,9 +582,11 @@ command_dict = {
     CMDDISPLAYBASECOIN: display_base_coin,
     CMDDISPLAYPAIRLIST: display_pair_list,
     CMDDISPLAYMINSTOCHRSI: display_min_stockrsi,
+    CMDDISPLAYINDICATORTRIGGER: display_indicator_trigger,
     CMDPOLLMINQUOTEVOLUME: poll_min_quote_volume,
     CMDPOLLBASECOIN: poll_base_coin,
     CMDPOLLPAIRLIST : poll_pair_list,
     CMDUPDATEPAIRLIST: update_pair_list,
-    CMDPOLLMINSTOCHRSI: poll_min_stockrsi
+    CMDPOLLMINSTOCHRSI: poll_min_stockrsi,
+    CMDPOLLINDICATORTRIGGER: poll_indicator_trigger
 }
