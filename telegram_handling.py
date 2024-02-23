@@ -394,6 +394,8 @@ async def display_settings(update: Update, context: CallbackContext):
     message = update.message if update.callback_query is None else update.callback_query.message
     chat_id = str(message.chat_id)
 
+    await message.reply_text("Getting settings...\nPlease wait till finished")
+
     exchange = load_json(FILENAMEEXCHANGE)
     if chat_id not in exchange.keys():
         await poll_exchange(update, context)
