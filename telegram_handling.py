@@ -3,7 +3,7 @@ import time
 import numpy as np
 
 from dotenv import dotenv_values
-from telegram import KeyboardButton, ReplyKeyboardMarkup, Update
+from telegram import ReplyKeyboardMarkup, Update
 from telegram.constants import ParseMode
 from telegram.ext import (Application, CallbackContext, CommandHandler,
                           PollAnswerHandler)
@@ -216,9 +216,10 @@ async def retrieve_all_signals(
                 continue
             signal_type_list = signal_list[signal_type]
             if len(signal_type_list) > 0:
+                date_time = signal_type_list[0]["datetime"]
                 await message.reply_text(
-                    f"{emoji_type[signal_type]} *{signal_type} signals " + \
-                    f"{timeframe_minute} minutes:*",
+                    fr"{emoji_type[signal_type]} *{date_time.strftime('%Y %m %d %H%M')} \| " + \
+                    fr"{timeframe_minute} min \| {signal_type} signals*",
                     parse_mode=ParseMode.MARKDOWN_V2)
                 for signal_list in signal_type_list:
                     await message.reply_text(
