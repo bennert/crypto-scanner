@@ -287,7 +287,9 @@ async def start(update: Update, context: CallbackContext):
         CMDUPDATEPAIRLIST,
         CMDPOLLINDICATORTRIGGER
     ]
-    keyboard = [[KeyboardButton("/" + menu_item)] for menu_item in menu_list]
+    # Add slash to command in menu list
+    menu_list = [f"/{x}" for x in menu_list]
+    keyboard = [menu_list[i:i+2] for i in range(0, len(menu_list), 2)]
     reply_markup = ReplyKeyboardMarkup(keyboard)
     await message.reply_text("Choose action:", reply_markup=reply_markup)
 
