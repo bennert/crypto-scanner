@@ -8,8 +8,9 @@ from telegram.constants import ParseMode
 from telegram.ext import (Application, CallbackContext, CommandHandler,
                           PollAnswerHandler)
 from file_handling import (file_exists, add_json, load_json, update_json, save_json,
-                            FILENAMEMINQUOTEVOLUME, FILENAMEBASECOIN, FILENAMEPAIRLIST,
-                            FILENAMEMINSTOCHRSI, FILENAMEBUYSIGNALSACTIVE, FILENAMEINDICATORTRIGGER)
+                            FILENAMEEXCHANGE, FILENAMEMINQUOTEVOLUME, FILENAMEBASECOIN,
+                            FILENAMEPAIRLIST, FILENAMEBUYSIGNALSACTIVE,
+                            FILENAMEINDICATORTRIGGER)
 from exchange_handling import (set_exchange, fetch_ticker, get_pair_list, retrieve_signals,
                                prev_timefram_minute_list)
 
@@ -20,20 +21,15 @@ CMD_START_SIGNALS = "StartSignals"
 CMD_STOP_SIGNALS = "StopSignals"
 CMD_CHECK_STATUS = "CheckStatus"
 
-CMD_DISPLAY_MIN_QUOTE_VOLUME = "DisplayMinQuoteVolume"
+CMD_DISPLAY_SETTINGS = "DisplaySettings"
+
+CMDPOLLEXCHANGE = "PollExchange"
+CMDPOLLBASECOIN = "PollBaseCoin"
 CMDPOLLMINQUOTEVOLUME = "PollMinQuoteVolume"
 
-CMDDISPLAYBASECOIN = "DisplayBaseCoin"
-CMDPOLLBASECOIN = "PollBaseCoin"
-
-CMDDISPLAYPAIRLIST = "DisplayPairList"
 CMDPOLLPAIRLIST = "PollPairList"
 CMDUPDATEPAIRLIST = "UpdatePairList"
 
-CMDDISPLAYMINSTOCHRSI = "DisplayMinStochRsi"
-CMDPOLLMINSTOCHRSI = "PollMinStochRsi"
-
-CMDDISPLAYINDICATORTRIGGER = "DisplayIndicatorTrigger"
 CMDPOLLINDICATORTRIGGER = "PollIndicatorTrigger"
 
 updating_pair_list = {}
@@ -91,7 +87,10 @@ async def receive_poll_selection(update: Update, context: CallbackContext) -> No
         return
     poll = context.bot_data[poll_id]["poll"]
 
-    if poll == CMDPOLLMINQUOTEVOLUME:
+    if poll == CMDPOLLEXCHANGE:
+        update_json(FILENAMEEXCHANGE, chat_id, questions[answer.option_ids[0]])
+        set_exchange(questions[answer.option_ids[0]])
+    elif poll == CMDPOLLMINQUOTEVOLUME:
         update_json(FILENAMEMINQUOTEVOLUME, chat_id, questions[answer.option_ids[0]])
     elif poll == CMDPOLLBASECOIN:
         update_json(FILENAMEBASECOIN, chat_id, questions[answer.option_ids[0]])
@@ -102,8 +101,6 @@ async def receive_poll_selection(update: Update, context: CallbackContext) -> No
         for question_id in selected_options:
             valid_coin_pairs.append(questions[question_id])
         add_json(FILENAMEPAIRLIST, chat_id, valid_coin_pairs)
-    elif poll == CMDPOLLMINSTOCHRSI:
-        update_json(FILENAMEMINSTOCHRSI, chat_id, questions[answer.option_ids[0]])
     elif poll == CMDPOLLINDICATORTRIGGER:
         indicator_trigger_list = []
         selected_options = answer.option_ids
@@ -233,12 +230,8 @@ async def get_signals(context: CallbackContext):
     """Get signals"""
     job = context.job
     message = job.data["message"]
-    update = job.data["update"]
     chat_id = str(message.chat_id)
-    min_stoch_rsi = load_json(FILENAMEMINSTOCHRSI)
-    if chat_id not in min_stoch_rsi.keys():
-        await poll_min_stockrsi(update, context)
-    min_stoch_rsi_value = int(min_stoch_rsi[chat_id])
+    min_stoch_rsi_value = 20
     timeframe_range = [3, 5]
     pair_list = load_json(FILENAMEPAIRLIST)
     await retrieve_all_signals(
@@ -274,25 +267,24 @@ async def generate_pair_list(context: CallbackContext):
 # pylint: disable=unused-argument
 async def start(update: Update, context: CallbackContext):
     """Start"""
-    set_exchange("kucoin")
     message = update.effective_message
     chat_id = str(update.effective_user.id)
+    exchange = load_json(FILENAMEEXCHANGE)
+    if chat_id not in exchange.keys():
+        await poll_exchange(update, context)
+        return
     signals_active = load_json(FILENAMEBUYSIGNALSACTIVE)
     signals_active_chat_id = chat_id in signals_active and \
         signals_active[chat_id]
     menu_list = [
         (CMD_STOP_SIGNALS if signals_active_chat_id else CMD_START_SIGNALS),
         CMD_CHECK_STATUS,
-        CMD_DISPLAY_MIN_QUOTE_VOLUME,
-        CMDDISPLAYBASECOIN,
-        CMDDISPLAYPAIRLIST,
-        CMDDISPLAYMINSTOCHRSI,
-        CMDDISPLAYINDICATORTRIGGER,
+        CMD_DISPLAY_SETTINGS,
+        CMDPOLLEXCHANGE,
         CMDPOLLMINQUOTEVOLUME,
         CMDPOLLBASECOIN,
         CMDPOLLPAIRLIST,
         CMDUPDATEPAIRLIST,
-        CMDPOLLMINSTOCHRSI,
         CMDPOLLINDICATORTRIGGER
     ]
     keyboard = [[KeyboardButton("/" + menu_item)] for menu_item in menu_list]
@@ -307,11 +299,20 @@ async def start_signals(update: Update, context: CallbackContext):
     job_queue = context.application.job_queue
     update_json(FILENAMEBUYSIGNALSACTIVE, chat_id, True)
     await start(update, context)
+
+    exchange = load_json(FILENAMEEXCHANGE)
+    if chat_id not in exchange.keys():
+        await stop_signals(update, context)
+        await poll_exchange(update, context)
+        return
+    set_exchange(exchange[chat_id])
+
     base_coin = load_json(FILENAMEBASECOIN)
     if chat_id not in base_coin.keys():
         await stop_signals(update, context)
         await poll_base_coin(update, context)
         return
+
     min_quote_volume = load_json(FILENAMEMINQUOTEVOLUME)
     if chat_id not in min_quote_volume.keys():
         await stop_signals(update, context)
@@ -331,9 +332,14 @@ async def start_signals(update: Update, context: CallbackContext):
             time.sleep(5)
             updating_text += "."
             msg.edit_text(updating_text)
+    await msg.edit_text("Checking signals of pair list:...")
+    pair_list_with_volume = get_pair_list_with_volume(
+        pair_list=pair_list[chat_id], min_quote_volume=min_quote_volume[chat_id])
     await msg.edit_text(
-        "Checking signals of pairs:\n* " + ("\n* ".join(sorted(pair_list[chat_id]))) + \
-        f"\nwith minimum day volume of {min_day_volume:7.0f}M {base_coin[chat_id]}")
+        "Checking signals of pair list:\n* " + ("\n* ".join(sorted(pair_list_with_volume))) + \
+        "\nwith minimum day volume " + \
+        f"on {exchange[chat_id]} of {min_day_volume:7.0f}M {base_coin[chat_id]}")
+
     data = context.user_data
     data["update"] = update
     data["message"] = message
@@ -371,69 +377,84 @@ async def check_status(update: Update, context: CallbackContext):
     await message.reply_text(
         "Scanner is " + ("" if signals_active_chat_id else "NOT ") + "checking signals")
 
-async def display_min_quote_volume(update: Update, context: CallbackContext) -> None:
-    """Display minimum quote volume"""
-    message = update.message if update.callback_query is None else update.callback_query.message
-    chat_id = str(message.chat_id)
-    min_quote_volume = load_json(FILENAMEMINQUOTEVOLUME)
-    if chat_id in min_quote_volume.keys():
-        await message.reply_text("Minimum Quote Volume: " + (min_quote_volume[chat_id]))
-    else:
-        await poll_min_quote_volume(update, context)
+def get_pair_list_with_volume(pair_list, min_quote_volume):
+    """Get pair list with volume"""
+    pair_list_with_volume = []
+    for coin_pair in pair_list:
+        ticker = fetch_ticker(coin_pair)
+        quote_volume = ticker["quoteVolume"]
+        if quote_volume > float(min_quote_volume):
+            pair_list_with_volume.append(f"{quote_volume/1000000:7.2f}M => {coin_pair}")
+    return pair_list_with_volume
 
-async def display_base_coin(update: Update, context: CallbackContext) -> None:
-    """Display base coin"""
+async def display_settings(update: Update, context: CallbackContext):
+    """Display settings"""
     message = update.message if update.callback_query is None else update.callback_query.message
     chat_id = str(message.chat_id)
-    base_coin = load_json(FILENAMEBASECOIN)
-    if chat_id in base_coin.keys():
-        await message.reply_text("Base coin: " + (base_coin[chat_id]))
-    else:
-        await poll_base_coin(update, context)
 
-async def display_pair_list(update: Update, context: CallbackContext) -> None:
-    """Display pair list"""
-    message = update.message if update.callback_query is None else update.callback_query.message
-    chat_id = str(message.chat_id)
+    exchange = load_json(FILENAMEEXCHANGE)
+    if chat_id not in exchange.keys():
+        await poll_exchange(update, context)
+        return
+    set_exchange(exchange[chat_id])
+
     base_coin = load_json(FILENAMEBASECOIN)
     if chat_id not in base_coin.keys():
         await poll_base_coin(update, context)
+        return
+
+    min_quote_volume = load_json(FILENAMEMINQUOTEVOLUME)
+    if chat_id not in min_quote_volume.keys():
+        await poll_min_quote_volume(update, context)
+        return
+
+    indicator_trigger = load_json(FILENAMEINDICATORTRIGGER)
+    if chat_id not in indicator_trigger.keys():
+        await poll_indicator_trigger(update, context)
+        return
+
     pair_list = load_json(FILENAMEPAIRLIST)
     if chat_id not in pair_list.keys():
         await update_pair_list(update, context)
         await message.reply_text(
-            f"First select pairs with /{CMDPOLLPAIRLIST} and click again on /{CMDDISPLAYPAIRLIST}")
-    else:
-        min_quote_volume = load_json(FILENAMEMINQUOTEVOLUME)
-        min_day_volume = int(min_quote_volume[chat_id])
-        pair_list_with_volume = []
-        for coin_pair in pair_list[chat_id]:
-            ticker = fetch_ticker(coin_pair)
-            quote_volume = ticker["quoteVolume"]
-            if quote_volume > min_day_volume:
-                pair_list_with_volume.append(f"{quote_volume/1000000:7.2f}M => {coin_pair}")
+            f"First select pairs with /{CMDPOLLPAIRLIST} and click again on " + \
+            f"/{CMD_DISPLAY_SETTINGS}")
+        return
+    pair_list_with_volume = get_pair_list_with_volume(
+        pair_list=pair_list[chat_id], min_quote_volume=min_quote_volume[chat_id])
 
-        await message.reply_text("Pair list:\n* " + ("\n* ".join(sorted(pair_list_with_volume))))
+    await message.reply_text(
+        "Settings:\n" + \
+        f"Exchange: {exchange[chat_id]}\n" + \
+        f"Base Coin: {base_coin[chat_id]}\n" + \
+        f"Minimum Quote Volume: {min_quote_volume[chat_id]}\n" + \
+        f"Indicator Trigger: {', '.join(indicator_trigger[chat_id])}\n" + \
+        "Pair List:\n* " + ("\n* ".join(sorted(pair_list_with_volume))))
 
-async def display_min_stockrsi(update: Update, context: CallbackContext) -> None:
-    """Display minimum stochrsi"""
-    message = update.message if update.callback_query is None else update.callback_query.message
-    chat_id = str(message.chat_id)
-    min_stoch_rsi = load_json(FILENAMEMINSTOCHRSI)
-    if chat_id in min_stoch_rsi.keys():
-        await message.reply_text("Minimum StochRsi: " + (min_stoch_rsi[chat_id]))
-    else:
-        await poll_min_stockrsi(update, context)
-
-async def display_indicator_trigger(update: Update, context: CallbackContext) -> None:
-    """Display indicator trigger"""
-    message = update.message if update.callback_query is None else update.callback_query.message
-    chat_id = str(message.chat_id)
-    indicator_trigger = load_json(FILENAMEINDICATORTRIGGER)
-    if chat_id in indicator_trigger.keys():
-        await message.reply_text("Indicator Trigger: " + ", ".join(indicator_trigger[chat_id]))
-    else:
-        await poll_indicator_trigger(update, context)
+async def poll_exchange(update: Update, context: CallbackContext) -> None:
+    """Poll exchange"""
+    exchanges = [
+        "binance",
+        "bybit",
+        "kucoin"
+    ]
+    message = await context.bot.send_poll(
+        update.effective_chat.id,
+        "Select exchange", 
+        exchanges,
+        is_anonymous=False,
+        allows_multiple_answers=False
+    )
+    payload = {# Save some info about the poll the bot_data for later use in receive_quiz_answer
+        message.poll.id: {
+            "poll": CMDPOLLEXCHANGE,
+            "questions": exchanges,
+            "chat_id": update.effective_chat.id,
+            "message_id": message.message_id,
+            "answers": 0
+        }
+    }
+    context.bot_data.update(payload)
 
 async def poll_min_quote_volume(update: Update, context: CallbackContext) -> None:
     """"Poll minimum quote volume"""
@@ -531,27 +552,6 @@ async def update_pair_list(update: Update, context: CallbackContext):
     context.application.job_queue.run_once(generate_pair_list, 1, data=data)
     updating_pair_list[str(message.chat_id)] = True
 
-async def poll_min_stockrsi(update: Update, context: CallbackContext) -> None:
-    """Poll minimum stochrsi"""
-    min_values = ["5", "10", "15", "20"]
-    message = await context.bot.send_poll(
-        update.effective_chat.id,
-        "Select bottom value of StochRsi", 
-        min_values,
-        is_anonymous=False,
-        allows_multiple_answers=False
-    )
-    payload = {# Save some info about the poll the bot_data for later use in receive_quiz_answer
-        message.poll.id: {
-            "poll": CMDPOLLMINSTOCHRSI,
-            "questions": min_values,
-            "chat_id": update.effective_chat.id,
-            "message_id": message.message_id,
-            "answers": 0
-        }
-    }
-    context.bot_data.update(payload)
-
 async def poll_indicator_trigger(update: Update, context: CallbackContext) -> None:
     """Poll indicator trigger"""
     indicator_values = [ "bb", "stoch", "stochRsi", "rsi"]
@@ -578,15 +578,11 @@ command_dict = {
     CMD_START_SIGNALS: start_signals,
     CMD_STOP_SIGNALS: stop_signals,
     CMD_CHECK_STATUS: check_status,
-    CMD_DISPLAY_MIN_QUOTE_VOLUME: display_min_quote_volume,
-    CMDDISPLAYBASECOIN: display_base_coin,
-    CMDDISPLAYPAIRLIST: display_pair_list,
-    CMDDISPLAYMINSTOCHRSI: display_min_stockrsi,
-    CMDDISPLAYINDICATORTRIGGER: display_indicator_trigger,
-    CMDPOLLMINQUOTEVOLUME: poll_min_quote_volume,
+    CMD_DISPLAY_SETTINGS: display_settings,
+    CMDPOLLEXCHANGE: poll_exchange,
     CMDPOLLBASECOIN: poll_base_coin,
+    CMDPOLLMINQUOTEVOLUME: poll_min_quote_volume,
     CMDPOLLPAIRLIST : poll_pair_list,
     CMDUPDATEPAIRLIST: update_pair_list,
-    CMDPOLLMINSTOCHRSI: poll_min_stockrsi,
     CMDPOLLINDICATORTRIGGER: poll_indicator_trigger
 }
