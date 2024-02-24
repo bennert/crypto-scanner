@@ -49,7 +49,7 @@ def copy_data(pair_list, timeframe_minute, date_time):
     return data
 
 async def retrieve_signals(
-        message, timeframe_minute, pair_list, min_stoch_rsi_value, indicator_trigger_list):
+        message, timeframe_minute, pair_list, indicator_trigger_list):
     """Retrieve buy and sell signals"""
     chat_id = str(message.chat_id)
     timeframe_hour = 60 / timeframe_minute
@@ -117,7 +117,7 @@ async def retrieve_signals(
         data_frame['stochRsiD'] = indicator_stoch_rsi.stochrsi_d() * 100
         data_frame['stochRsiK'] = indicator_stoch_rsi.stochrsi_k() * 100
         stoch_rsi_max = 80
-        stoch_rsi_min = min_stoch_rsi_value
+        stoch_rsi_min = 20
         stoch_rsi_buy = \
             data_frame['stochRsiD'].iloc[-1] < stoch_rsi_min and \
             data_frame['stochRsiK'].iloc[-1] < stoch_rsi_min

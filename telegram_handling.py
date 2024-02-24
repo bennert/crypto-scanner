@@ -201,8 +201,7 @@ def get_message_content(item, timeframe_minute, base_coin):
     return message_content.replace(".", r"\.").replace("|", r"\|").replace("-", r"\-") \
         .replace("{", r"\{").replace("}", r"\}")
 
-async def retrieve_all_signals(
-        chat_id, timeframe_range, message, pair_list, min_stoch_rsi_value):
+async def retrieve_all_signals(chat_id, timeframe_range, message, pair_list):
     """Retrieve all signals"""
     base_coin = load_json(FILENAMEBASECOIN)
     indicator_trigger = load_json(FILENAMEINDICATORTRIGGER)
@@ -210,7 +209,7 @@ async def retrieve_all_signals(
         prev_timefram_minute_list[chat_id] = dict([[x, ""] for x in timeframe_range])
     for timeframe_minute in prev_timefram_minute_list[chat_id]:
         signal_list = await retrieve_signals(
-            message, timeframe_minute, pair_list, min_stoch_rsi_value, indicator_trigger[chat_id])
+            message, timeframe_minute, pair_list, indicator_trigger[chat_id])
         for signal_type in ["Buy", "Sell"]:
             if signal_type not in signal_list:
                 continue
@@ -229,14 +228,11 @@ async def retrieve_all_signals(
 
 async def get_signals(context: CallbackContext):
     """Get signals"""
-    job = context.job
-    message = job.data["message"]
+    message = context.job.data["message"]
     chat_id = str(message.chat_id)
-    min_stoch_rsi_value = 20
     timeframe_range = [3, 5]
-    pair_list = load_json(FILENAMEPAIRLIST)
-    await retrieve_all_signals(
-        chat_id, timeframe_range, message, pair_list, min_stoch_rsi_value)
+
+    await retrieve_all_signals(chat_id, timeframe_range, message, load_json(FILENAMEPAIRLIST))
 
 async def generate_pair_list(context: CallbackContext):
     """Generate pair list"""
