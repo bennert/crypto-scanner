@@ -115,9 +115,6 @@ def get_message_content(item, timeframe_minute, base_coin):
     message_content = ""
     previour_date_time = ""
     date_time = item["datetime"]
-    if previour_date_time != date_time:
-        previour_date_time = date_time
-        message_content += f"Time: {date_time.strftime('%Y %m %d %H%M')}\n"
     pair = item["pair"]
     close = item["close"]
     quote_volume_m = item["quote_volume_m"]
@@ -179,9 +176,11 @@ def get_message_content(item, timeframe_minute, base_coin):
     for key, val in emoji_momentum_level.items():
         if momentum_strength in key:
             momentum_emoji = val
+    if previour_date_time != date_time:
+        previour_date_time = date_time
+        message_content += f"{signal_emoji} *{date_time.strftime('%Y %m %d %H%M')} | {timeframe_minute} min*\n"
     message_content += \
-        f"{momentum_emoji} {momentum_strength}% {signal_emoji} {pair} | " +\
-            f"{timeframe_minute} min | *[{signal[signal_type]}]*\n" \
+        f"{momentum_emoji} {momentum_strength}% *{pair} | [{signal[signal_type]}]*\n" \
         f"Change day: {change_day:.2f} | {change_day_perc:.2f}% | " + \
         f"{quote_volume_m:7.2f}M {base_coin}\n" + \
         f"{'*' if bb_signal else ''}" \
