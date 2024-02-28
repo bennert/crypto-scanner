@@ -9,6 +9,7 @@ FILENAMEMINQUOTEVOLUME = "./state/minquotevol.json"
 FILENAMEBASECOIN = "./state/basecoin.json"
 FILENAMEPAIRLIST = "./state/pairlist.json"
 FILENAMEINDICATORTRIGGER = "./state/indicator_trigger.json"
+FILENAMETOOL = "./state/tool.json"
 
 def add_json(file_name, chat_id, value):
     """Add json value of chat_id to file"""

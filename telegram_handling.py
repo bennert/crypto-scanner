@@ -10,7 +10,7 @@ from telegram.ext import (Application, CallbackContext, CommandHandler,
 from file_handling import (file_exists, add_json, load_json, update_json, save_json,
                             FILENAMEEXCHANGE, FILENAMEMINQUOTEVOLUME, FILENAMEBASECOIN,
                             FILENAMEPAIRLIST, FILENAMEBUYSIGNALSACTIVE,
-                            FILENAMEINDICATORTRIGGER)
+                            FILENAMEINDICATORTRIGGER, FILENAMETOOL)
 from exchange_handling import (set_exchange, fetch_ticker, get_pair_list, retrieve_signals,
                                prev_timefram_minute_list)
 
@@ -23,9 +23,10 @@ CMD_CHECK_STATUS = "CheckStatus"
 
 CMD_DISPLAY_SETTINGS = "DisplaySettings"
 
-CMDPOLLEXCHANGE = "PollExchange"
-CMDPOLLBASECOIN = "PollBaseCoin"
-CMDPOLLMINQUOTEVOLUME = "PollMinQuoteVolume"
+CMD_POLL_TOOL = "PollTool"
+CMD_POLL_EXCHANGE = "PollExchange"
+CMD_POLL_BASECOIN = "PollBaseCoin"
+CMD_POLL_MIN_QUOTE_VOLUME = "PollMinQuoteVolume"
 
 CMDPOLLPAIRLIST = "PollPairList"
 CMDUPDATEPAIRLIST = "UpdatePairList"
@@ -33,6 +34,11 @@ CMDUPDATEPAIRLIST = "UpdatePairList"
 CMDPOLLINDICATORTRIGGER = "PollIndicatorTrigger"
 
 updating_pair_list = {}
+
+tool_url = {
+    "tradingview": "https://www.tradingview.com/chart?symbol=",
+    "hypertrader": "https://www.tradingview.com/chart?symbol="
+}
 
 emoji_type = {
     "Buy": "\U0001F7E2",  # Green circle
@@ -87,12 +93,14 @@ async def receive_poll_selection(update: Update, context: CallbackContext) -> No
         return
     poll = context.bot_data[poll_id]["poll"]
 
-    if poll == CMDPOLLEXCHANGE:
+    if poll == CMD_POLL_TOOL:
+        update_json(FILENAMETOOL, chat_id, questions[answer.option_ids[0]])
+    elif poll == CMD_POLL_EXCHANGE:
         update_json(FILENAMEEXCHANGE, chat_id, questions[answer.option_ids[0]])
         set_exchange(questions[answer.option_ids[0]])
-    elif poll == CMDPOLLMINQUOTEVOLUME:
+    elif poll == CMD_POLL_MIN_QUOTE_VOLUME:
         update_json(FILENAMEMINQUOTEVOLUME, chat_id, questions[answer.option_ids[0]])
-    elif poll == CMDPOLLBASECOIN:
+    elif poll == CMD_POLL_BASECOIN:
         update_json(FILENAMEBASECOIN, chat_id, questions[answer.option_ids[0]])
     elif poll == CMDPOLLPAIRLIST:
         #To be updated to handle multiple poll answers
@@ -110,12 +118,13 @@ async def receive_poll_selection(update: Update, context: CallbackContext) -> No
     quiz_data = context.bot_data[poll_id]
     await context.bot.stop_poll(quiz_data["chat_id"], quiz_data["message_id"])
 
-def get_message_content(item, timeframe_minute, base_coin):
+def get_message_content(item, timeframe_minute, base_coin, tool):
     """Compose content of message"""
     message_content = ""
     previour_date_time = ""
     date_time = item["datetime"]
     pair = item["pair"]
+    pair_url = f"[{pair}]({tool_url[tool]}{pair.replace('/', '')})"
     close = item["close"]
     quote_volume_m = item["quote_volume_m"]
     change_day = item["change_day"]
@@ -178,9 +187,10 @@ def get_message_content(item, timeframe_minute, base_coin):
             momentum_emoji = val
     if previour_date_time != date_time:
         previour_date_time = date_time
-        message_content += f"{signal_emoji} *{date_time.strftime('%Y %m %d %H%M')} | {timeframe_minute} min*\n"
+        message_content += f"{signal_emoji} *{date_time.strftime('%Y %m %d %H%M')} " + \
+            f"| {timeframe_minute} min*\n"
     message_content += \
-        f"{momentum_emoji} {momentum_strength}% *{pair} | [{signal[signal_type]}]*\n" \
+        f"{momentum_emoji} {momentum_strength}% *{pair_url} | [{signal[signal_type]}]*\n" \
         f"Change day: {change_day:.2f} | {change_day_perc:.2f}% | " + \
         f"{quote_volume_m:7.2f}M {base_coin}\n" + \
         f"{'*' if bb_signal else ''}" \
@@ -204,6 +214,7 @@ async def retrieve_all_signals(chat_id, timeframe_range, message, pair_list):
     """Retrieve all signals"""
     base_coin = load_json(FILENAMEBASECOIN)
     indicator_trigger = load_json(FILENAMEINDICATORTRIGGER)
+    tool = load_json(FILENAMETOOL)
     if chat_id not in prev_timefram_minute_list:
         prev_timefram_minute_list[chat_id] = dict([[x, ""] for x in timeframe_range])
     for timeframe_minute in prev_timefram_minute_list[chat_id]:
@@ -222,7 +233,7 @@ async def retrieve_all_signals(chat_id, timeframe_range, message, pair_list):
                 for signal_list in signal_type_list:
                     await message.reply_text(
                         get_message_content(
-                            signal_list, timeframe_minute, base_coin[chat_id]),
+                            signal_list, timeframe_minute, base_coin[chat_id], tool[chat_id]),
                         parse_mode=ParseMode.MARKDOWN_V2)
 
 async def get_signals(context: CallbackContext):
@@ -276,9 +287,10 @@ async def start(update: Update, context: CallbackContext):
         (CMD_STOP_SIGNALS if signals_active_chat_id else CMD_START_SIGNALS),
         CMD_CHECK_STATUS,
         CMD_DISPLAY_SETTINGS,
-        CMDPOLLEXCHANGE,
-        CMDPOLLMINQUOTEVOLUME,
-        CMDPOLLBASECOIN,
+        CMD_POLL_TOOL,
+        CMD_POLL_EXCHANGE,
+        CMD_POLL_MIN_QUOTE_VOLUME,
+        CMD_POLL_BASECOIN,
         CMDPOLLPAIRLIST,
         CMDUPDATEPAIRLIST,
         CMDPOLLINDICATORTRIGGER
@@ -297,6 +309,12 @@ async def start_signals(update: Update, context: CallbackContext):
     job_queue = context.application.job_queue
     update_json(FILENAMEBUYSIGNALSACTIVE, chat_id, True)
     await start(update, context)
+
+    tool = load_json(FILENAMETOOL)
+    if chat_id not in tool.keys():
+        await stop_signals(update, context)
+        await poll_tool(message, context)
+        return
 
     exchange = load_json(FILENAMEEXCHANGE)
     if chat_id not in exchange.keys():
@@ -392,6 +410,11 @@ async def display_settings(update: Update, context: CallbackContext):
 
     await message.reply_text("Getting settings...\nPlease wait till finished")
 
+    tool = load_json(FILENAMETOOL)
+    if chat_id not in tool.keys():
+        await poll_tool(update, context)
+        return
+
     exchange = load_json(FILENAMEEXCHANGE)
     if chat_id not in exchange.keys():
         await poll_exchange(update, context)
@@ -425,11 +448,33 @@ async def display_settings(update: Update, context: CallbackContext):
 
     await message.reply_text(
         "Settings:\n" + \
+        f"Tool: {tool[chat_id]}\n" + \
         f"Exchange: {exchange[chat_id]}\n" + \
         f"Base Coin: {base_coin[chat_id]}\n" + \
         f"Minimum Quote Volume: {min_quote_volume[chat_id]}\n" + \
         f"Indicator Trigger: {', '.join(indicator_trigger[chat_id])}\n" + \
         "Pair List:\n* " + ("\n* ".join(sorted(pair_list_with_volume))))
+
+async def poll_tool(update: Update, context: CallbackContext) -> None:
+    """Poll tool"""
+    tools = list(tool_url.keys())
+    message = await context.bot.send_poll(
+        update.effective_chat.id,
+        "Select tool", 
+        tools,
+        is_anonymous=False,
+        allows_multiple_answers=False
+    )
+    payload = {# Save some info about the poll the bot_data for later use in receive_quiz_answer
+        message.poll.id: {
+            "poll": CMD_POLL_TOOL,
+            "questions": tools,
+            "chat_id": update.effective_chat.id,
+            "message_id": message.message_id,
+            "answers": 0
+        }
+    }
+    context.bot_data.update(payload)
 
 async def poll_exchange(update: Update, context: CallbackContext) -> None:
     """Poll exchange"""
@@ -447,7 +492,7 @@ async def poll_exchange(update: Update, context: CallbackContext) -> None:
     )
     payload = {# Save some info about the poll the bot_data for later use in receive_quiz_answer
         message.poll.id: {
-            "poll": CMDPOLLEXCHANGE,
+            "poll": CMD_POLL_EXCHANGE,
             "questions": exchanges,
             "chat_id": update.effective_chat.id,
             "message_id": message.message_id,
@@ -473,7 +518,7 @@ async def poll_min_quote_volume(update: Update, context: CallbackContext) -> Non
     )
     payload = {# Save some info about the poll the bot_data for later use in receive_quiz_answer
         message.poll.id: {
-            "poll": CMDPOLLMINQUOTEVOLUME,
+            "poll": CMD_POLL_MIN_QUOTE_VOLUME,
             "questions": quote_volumes,
             "chat_id": update.effective_chat.id,
             "message_id": message.message_id,
@@ -498,7 +543,7 @@ async def poll_base_coin(update: Update, context: CallbackContext) -> None:
     )
     payload = {# Save some info about the poll the bot_data for later use in receive_quiz_answer
         message.poll.id: {
-            "poll": CMDPOLLBASECOIN,
+            "poll": CMD_POLL_BASECOIN,
             "questions": coins,
             "chat_id": update.effective_chat.id,
             "message_id": message.message_id,
@@ -579,9 +624,10 @@ command_dict = {
     CMD_STOP_SIGNALS: stop_signals,
     CMD_CHECK_STATUS: check_status,
     CMD_DISPLAY_SETTINGS: display_settings,
-    CMDPOLLEXCHANGE: poll_exchange,
-    CMDPOLLBASECOIN: poll_base_coin,
-    CMDPOLLMINQUOTEVOLUME: poll_min_quote_volume,
+    CMD_POLL_TOOL: poll_tool,
+    CMD_POLL_EXCHANGE: poll_exchange,
+    CMD_POLL_BASECOIN: poll_base_coin,
+    CMD_POLL_MIN_QUOTE_VOLUME: poll_min_quote_volume,
     CMDPOLLPAIRLIST : poll_pair_list,
     CMDUPDATEPAIRLIST: update_pair_list,
     CMDPOLLINDICATORTRIGGER: poll_indicator_trigger
