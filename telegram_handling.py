@@ -47,13 +47,13 @@ emoji_type = {
 }
 
 emoji_momentum_level = {
-    range(0, 10):   "\U0001F7E9",  # Green square
-    range(10, 20):  "\U0001F7EA",  # Purple square
-    range(20, 30):  "\U0001F7E6",  # Blue square
+    range(0, 20):   "\U0001F7E9",  # Green square
+    range(20, 25):  "\U0001F7EA",  # Purple square
+    range(25, 30):  "\U0001F7E6",  # Blue square
     range(30, 70):  "\U0001F533",  # White square
-    range(70, 80):  "\U0001F7E8",  # Yellow square
-    range(80, 90):  "\U0001F7E7",  # Orange square
-    range(90, 101): "\U0001F7E5",  # Red square
+    range(70, 75):  "\U0001F7E8",  # Yellow square
+    range(75, 80):  "\U0001F7E7",  # Orange square
+    range(80, 101): "\U0001F7E5",  # Red square
 }
 
 def start_telegram_bot():
@@ -176,7 +176,7 @@ def get_message_content(item, timeframe_minute, base_coin, tool):
     stoch_rsi_k = item["stochRsiK"]
     rsi = item["rsi"]
     # Calculate momentum strength by using combination of stoch and rsi
-    momentum_strength = int(0.25 * stoch_k + 0.25 * stoch_d + 0.5 * rsi)
+    momentum_strength = round(rsi) if stoch_buy or stoch_sell else 50
 
     macd_value = item["macdValue"]
     macd_signal = item.get("macdSignal", 0)
