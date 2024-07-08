@@ -398,6 +398,8 @@ def get_pair_list_with_volume(pair_list, min_quote_volume):
     pair_list_with_volume = []
     for coin_pair in pair_list:
         ticker = fetch_ticker(coin_pair)
+        if ticker is None:
+            continue
         quote_volume = ticker["quoteVolume"]
         if quote_volume > float(min_quote_volume):
             pair_list_with_volume.append(f"{quote_volume/1000000:7.2f}M => {coin_pair}")

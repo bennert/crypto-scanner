@@ -12,30 +12,32 @@ from telegram.error import TimedOut
 dataList = {}
 prev_timefram_minute_list = {}
 
-exchange = None
+EXCHANGE = ccxt.binance()
 
 def set_exchange(exchange_name):
     """Set exchange"""
-    global exchange
+    global EXCHANGE
     if exchange_name in ccxt.exchanges:
         exchange_class = getattr(ccxt, exchange_name)
-        exchange = exchange_class()
+        EXCHANGE = exchange_class()
     else:
-        exchange = ccxt.binance()
+        EXCHANGE = ccxt.binance()
 
 async def get_pair_list(base_coin, min_day_volume, message, heading):
     """Get pair list"""
-    exchange.load_markets()
-    coin_pairs = [p for p in exchange.symbols \
+    EXCHANGE.load_markets()
+    coin_pairs = [p for p in EXCHANGE.symbols \
         if '/' + base_coin in p and 'BUSD' not in p]
     valid_coin_pairs = []
     for coin_pair in coin_pairs:
-        if exchange.markets[coin_pair]['active']:
+        if EXCHANGE.markets[coin_pair]['active']:
             try:
                 await message.edit_text(f"{heading}Checking pair:\n{coin_pair}")
             except (TimedOut) as exception:
                 print(f"Message with coin pair {coin_pair} got exception {exception}")
-            ticker = exchange.fetch_ticker(coin_pair)
+            ticker = fetch_ticker(coin_pair)
+            if ticker is None:
+                continue
             if ticker["quoteVolume"] > min_day_volume:
                 valid_coin_pairs.append(coin_pair)
     return valid_coin_pairs
@@ -59,10 +61,12 @@ async def retrieve_signals(
     for pair in pair_list[chat_id]:
         if len(data) > 0 and pair in data:
             continue
-        ticker = exchange.fetch_ticker(pair)
+        ticker = fetch_ticker(pair)
+        if ticker is None:
+            continue
         quote_volume_m = ticker["quoteVolume"]/1000000
 
-        bars = exchange.fetch_ohlcv(pair, timeframe=timeframe, limit=timeframe_day)
+        bars = EXCHANGE.fetch_ohlcv(pair, timeframe=timeframe, limit=timeframe_day)
         data_frame = pd.DataFrame(
             bars[:-1], columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
         timestamp = int(data_frame["timestamp"].iloc[-1])/1000
@@ -195,4 +199,8 @@ async def retrieve_signals(
 
 def fetch_ticker(pair):
     """Fetch ticker"""
-    return exchange.fetch_ticker(pair)
+    if EXCHANGE.symbols is None:
+        EXCHANGE.load_markets()
+    if pair in EXCHANGE.symbols:
+        return EXCHANGE.fetch_ticker(pair)
+    return None
