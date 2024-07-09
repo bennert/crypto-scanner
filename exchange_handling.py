@@ -29,12 +29,15 @@ async def get_pair_list(base_coin, min_day_volume, message, heading):
     coin_pairs = [p for p in EXCHANGE.symbols \
         if '/' + base_coin in p and 'BUSD' not in p]
     valid_coin_pairs = []
+    current_coin_pair = 0
     for coin_pair in coin_pairs:
+        current_coin_pair += 1
         if EXCHANGE.markets[coin_pair]['active']:
-            try:
-                await message.edit_text(f"{heading}Checking pair:\n{coin_pair}")
-            except (TimedOut) as exception:
-                print(f"Message with coin pair {coin_pair} got exception {exception}")
+            if current_coin_pair % 10 == 0:
+                try:
+                    await message.edit_text(f"{heading}Checking pair:\n{coin_pair}")
+                except (TimedOut) as exception:
+                    print(f"Message with coin pair {coin_pair} got exception {exception}")
             ticker = fetch_ticker(coin_pair)
             if ticker is None:
                 continue
