@@ -509,7 +509,9 @@ async def poll_min_quote_volume(update: Update, context: CallbackContext) -> Non
         "500000000",
         "100000000",
         "50000000",
-        "10000000"
+        "10000000",
+        "5000000",
+        "1000000"
     ]
     message = await context.bot.send_poll(
         update.effective_chat.id,
