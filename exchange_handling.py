@@ -57,7 +57,7 @@ async def retrieve_signals(
         message, timeframe_minute, pair_list, indicator_trigger_list):
     """Retrieve buy and sell signals"""
     chat_id = str(message.chat_id)
-    timeframe_hour = 60 / timeframe_minute
+    timeframe_hour = 60 / int(timeframe_minute)
     timeframe_day = int(24 * timeframe_hour)
     timeframe = str(timeframe_minute) + 'm'
     data = {}

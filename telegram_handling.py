@@ -7,10 +7,10 @@ from telegram import ReplyKeyboardMarkup, Update
 from telegram.constants import ParseMode
 from telegram.ext import (Application, CallbackContext, CommandHandler,
                           PollAnswerHandler)
-from file_handling import (file_exists, add_json, load_json, update_json, save_json,
-                            FILENAMEEXCHANGE, FILENAMEMINQUOTEVOLUME, FILENAMEBASECOIN,
-                            FILENAMEPAIRLIST, FILENAMEBUYSIGNALSACTIVE,
-                            FILENAMEINDICATORTRIGGER, FILENAMETOOL)
+from file_handling import (
+    file_exists, add_json, load_json, update_json, save_json,
+    FILENAMEEXCHANGE, FILENAMEMINQUOTEVOLUME, FILENAMETIMEFRAMELIST, FILENAMEBASECOIN,
+    FILENAMEPAIRLIST, FILENAMEBUYSIGNALSACTIVE, FILENAMEINDICATORTRIGGER, FILENAMETOOL)
 from exchange_handling import (set_exchange, fetch_ticker, get_pair_list, retrieve_signals,
                                prev_timefram_minute_list)
 
@@ -27,6 +27,7 @@ CMD_POLL_TOOL = "PollTool"
 CMD_POLL_EXCHANGE = "PollExchange"
 CMD_POLL_BASECOIN = "PollBaseCoin"
 CMD_POLL_MIN_QUOTE_VOLUME = "PollMinQuoteVolume"
+CMD_POLL_TIMEFRAME = "PollTimeframe"
 
 CMDPOLLPAIRLIST = "PollPairList"
 CMDUPDATEPAIRLIST = "UpdatePairList"
@@ -100,6 +101,11 @@ async def receive_poll_selection(update: Update, context: CallbackContext) -> No
         set_exchange(questions[answer.option_ids[0]])
     elif poll == CMD_POLL_MIN_QUOTE_VOLUME:
         update_json(FILENAMEMINQUOTEVOLUME, chat_id, questions[answer.option_ids[0]])
+    elif poll == CMD_POLL_TIMEFRAME:
+        timeframe_list = []
+        for question_id in answer.option_ids:
+            timeframe_list.append(questions[question_id])
+        update_json(FILENAMETIMEFRAMELIST, chat_id, timeframe_list)
     elif poll == CMD_POLL_BASECOIN:
         update_json(FILENAMEBASECOIN, chat_id, questions[answer.option_ids[0]])
     elif poll == CMDPOLLPAIRLIST:
@@ -210,13 +216,13 @@ def get_message_content(item, timeframe_minute, base_coin, tool):
     return message_content.replace(".", r"\.").replace("|", r"\|").replace("-", r"\-") \
         .replace("{", r"\{").replace("}", r"\}")
 
-async def retrieve_all_signals(chat_id, timeframe_range, message, pair_list):
+async def retrieve_all_signals(chat_id, timeframe_list, message, pair_list):
     """Retrieve all signals"""
     base_coin = load_json(FILENAMEBASECOIN)
     indicator_trigger = load_json(FILENAMEINDICATORTRIGGER)
     tool = load_json(FILENAMETOOL)
     if chat_id not in prev_timefram_minute_list:
-        prev_timefram_minute_list[chat_id] = dict([[x, ""] for x in timeframe_range])
+        prev_timefram_minute_list[chat_id] = dict([[x, ""] for x in timeframe_list])
     for timeframe_minute in prev_timefram_minute_list[chat_id]:
         signal_list = await retrieve_signals(
             message, timeframe_minute, pair_list, indicator_trigger[chat_id])
@@ -240,9 +246,9 @@ async def get_signals(context: CallbackContext):
     """Get signals"""
     message = context.job.data["message"]
     chat_id = str(message.chat_id)
-    timeframe_range = [1, 3, 5, 15]
+    timeframe_list = load_json(FILENAMETIMEFRAMELIST)
 
-    await retrieve_all_signals(chat_id, timeframe_range, message, load_json(FILENAMEPAIRLIST))
+    await retrieve_all_signals(chat_id, timeframe_list[chat_id], message, load_json(FILENAMEPAIRLIST))
 
 async def generate_pair_list(context: CallbackContext):
     """Generate pair list"""
@@ -290,6 +296,7 @@ async def start(update: Update, context: CallbackContext):
         CMD_POLL_TOOL,
         CMD_POLL_EXCHANGE,
         CMD_POLL_MIN_QUOTE_VOLUME,
+        CMD_POLL_TIMEFRAME,
         CMD_POLL_BASECOIN,
         CMDPOLLPAIRLIST,
         CMDUPDATEPAIRLIST,
@@ -433,6 +440,11 @@ async def display_settings(update: Update, context: CallbackContext):
         await poll_min_quote_volume(update, context)
         return
 
+    time_frame_list = load_json(FILENAMETIMEFRAMELIST)
+    if chat_id not in time_frame_list.keys():
+        await poll_time_frame(update, context)
+        return
+
     indicator_trigger = load_json(FILENAMEINDICATORTRIGGER)
     if chat_id not in indicator_trigger.keys():
         await poll_indicator_trigger(update, context)
@@ -454,6 +466,7 @@ async def display_settings(update: Update, context: CallbackContext):
         f"Exchange: {exchange[chat_id]}\n" + \
         f"Base Coin: {base_coin[chat_id]}\n" + \
         f"Minimum Quote Volume: {min_quote_volume[chat_id]}\n" + \
+        f"Time Frame List: {', '.join(time_frame_list[chat_id])}\n" + \
         f"Indicator Trigger: {', '.join(indicator_trigger[chat_id])}\n" + \
         "Pair List:\n* " + ("\n* ".join(sorted(pair_list_with_volume))))
 
@@ -524,6 +537,32 @@ async def poll_min_quote_volume(update: Update, context: CallbackContext) -> Non
         message.poll.id: {
             "poll": CMD_POLL_MIN_QUOTE_VOLUME,
             "questions": quote_volumes,
+            "chat_id": update.effective_chat.id,
+            "message_id": message.message_id,
+            "answers": 0
+        }
+    }
+    context.bot_data.update(payload)
+
+async def poll_time_frame(update: Update, context: CallbackContext) -> None:
+    """Poll time frame"""
+    time_frames = [
+        "1",
+        "3",
+        "5",
+        "15"
+    ]
+    message = await context.bot.send_poll(
+        update.effective_chat.id,
+        "Select time frame", 
+        time_frames,
+        is_anonymous=False,
+        allows_multiple_answers=True
+    )
+    payload = {# Save some info about the poll the bot_data for later use in receive_quiz_answer
+        message.poll.id: {
+            "poll": CMD_POLL_TIMEFRAME,
+            "questions": time_frames,
             "chat_id": update.effective_chat.id,
             "message_id": message.message_id,
             "answers": 0
@@ -632,6 +671,7 @@ command_dict = {
     CMD_POLL_EXCHANGE: poll_exchange,
     CMD_POLL_BASECOIN: poll_base_coin,
     CMD_POLL_MIN_QUOTE_VOLUME: poll_min_quote_volume,
+    CMD_POLL_TIMEFRAME: poll_time_frame,
     CMDPOLLPAIRLIST : poll_pair_list,
     CMDUPDATEPAIRLIST: update_pair_list,
     CMDPOLLINDICATORTRIGGER: poll_indicator_trigger

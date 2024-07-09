@@ -6,6 +6,7 @@ import os
 FILENAMEBUYSIGNALSACTIVE = "./state/buysignalsactive.json"
 FILENAMEEXCHANGE = "./state/exchange.json"
 FILENAMEMINQUOTEVOLUME = "./state/minquotevol.json"
+FILENAMETIMEFRAMELIST = "./state/timeframelist.json"
 FILENAMEBASECOIN = "./state/basecoin.json"
 FILENAMEPAIRLIST = "./state/pairlist.json"
 FILENAMEINDICATORTRIGGER = "./state/indicator_trigger.json"
