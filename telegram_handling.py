@@ -240,7 +240,7 @@ async def get_signals(context: CallbackContext):
     """Get signals"""
     message = context.job.data["message"]
     chat_id = str(message.chat_id)
-    timeframe_range = [3, 5]
+    timeframe_range = [1, 3, 5, 15]
 
     await retrieve_all_signals(chat_id, timeframe_range, message, load_json(FILENAMEPAIRLIST))
 
