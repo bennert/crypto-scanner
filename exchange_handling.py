@@ -205,5 +205,8 @@ def fetch_ticker(pair):
     if EXCHANGE.symbols is None:
         EXCHANGE.load_markets()
     if pair in EXCHANGE.symbols:
-        return EXCHANGE.fetch_ticker(pair)
+        try:
+            return EXCHANGE.fetch_ticker(pair)
+        except ccxt.NetworkError:
+            print("Network error")
     return None
