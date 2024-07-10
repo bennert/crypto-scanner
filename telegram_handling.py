@@ -40,25 +40,26 @@ tool_url = {
     "tradingview": "https://www.tradingview.com/chart?symbol=",
     "hypertrader": "https://gethypertrader.com/app",
     "kucoin": "https://www.kucoin.com/trade/",
-    "altrady": "https://app.altrady.com/dashboard#/trade/",
+    "altrady": "https://app.altrady.com/d/",
 }
 
 altrady_exchange = {
-    "binance": "BINA",
-    "bybit": "BYBI",
-    "kucoin": "KUCN"
+    "binance": "bina",
+    "bybit": "bybi",
+    "kucoin": "kucn"
 }
 
-def get_tool_url(tool, exchange, pair):
+def get_tool_url(tool, exchange, pair, timeframe_minute):
     """Get tool url"""
     if tool == "tradingview":
-        return tool_url[tool] + exchange.upper() + "%3A" + pair.replace('/', '')
+        return tool_url[tool] + exchange.upper() + "%3A" + pair.replace('/', '') + f"&interval={timeframe_minute}"
     elif tool == "hypertrader":
         return tool_url[tool]
     elif tool == "kucoin":
         return tool_url[tool] + pair.replace('/', '-')
     elif tool == "altrady":
-        pair_swapped = pair.split('/').reverse()
+        pair_swapped = pair.split('/')
+        pair_swapped.reverse()
         return tool_url[tool] + altrady_exchange[exchange] + "_" + '_'.join(pair_swapped)
     else:
         return ""
@@ -152,7 +153,7 @@ def get_message_content(item, timeframe_minute, base_coin, tool, exchange):
     previour_date_time = ""
     date_time = item["datetime"]
     pair = item["pair"]
-    pair_url = f"[{pair}]({get_tool_url(tool, exchange, pair)})"
+    pair_url = f"[{pair}]({get_tool_url(tool, exchange, pair, timeframe_minute)})"
     close = item["close"]
     quote_volume_m = item["quote_volume_m"]
     change_day = item["change_day"]
