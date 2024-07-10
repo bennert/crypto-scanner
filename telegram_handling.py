@@ -38,8 +38,30 @@ updating_pair_list = {}
 
 tool_url = {
     "tradingview": "https://www.tradingview.com/chart?symbol=",
-    "hypertrader": "https://www.tradingview.com/chart?symbol="
+    "hypertrader": "https://gethypertrader.com/app",
+    "kucoin": "https://www.kucoin.com/trade/",
+    "altrady": "https://app.altrady.com/dashboard#/trade/",
 }
+
+altrady_exchange = {
+    "binance": "BINA",
+    "bybit": "BYBI",
+    "kucoin": "KUCN"
+}
+
+def get_tool_url(tool, exchange, pair):
+    """Get tool url"""
+    if tool == "tradingview":
+        return tool_url[tool] + exchange.upper() + "%3A" + pair.replace('/', '')
+    elif tool == "hypertrader":
+        return tool_url[tool]
+    elif tool == "kucoin":
+        return tool_url[tool] + pair.replace('/', '-')
+    elif tool == "altrady":
+        pair_swapped = pair.split('/').reverse()
+        return tool_url[tool] + altrady_exchange[exchange] + "_" + '_'.join(pair_swapped)
+    else:
+        return ""
 
 emoji_type = {
     "Buy": "\U0001F7E2",  # Green circle
@@ -124,13 +146,13 @@ async def receive_poll_selection(update: Update, context: CallbackContext) -> No
     quiz_data = context.bot_data[poll_id]
     await context.bot.stop_poll(quiz_data["chat_id"], quiz_data["message_id"])
 
-def get_message_content(item, timeframe_minute, base_coin, tool):
+def get_message_content(item, timeframe_minute, base_coin, tool, exchange):
     """Compose content of message"""
     message_content = ""
     previour_date_time = ""
     date_time = item["datetime"]
     pair = item["pair"]
-    pair_url = f"[{pair}]({tool_url[tool]}{pair.replace('/', '')})"
+    pair_url = f"[{pair}]({get_tool_url(tool, exchange, pair)})"
     close = item["close"]
     quote_volume_m = item["quote_volume_m"]
     change_day = item["change_day"]
@@ -221,6 +243,7 @@ async def retrieve_all_signals(chat_id, timeframe_list, message, pair_list):
     base_coin = load_json(FILENAMEBASECOIN)
     indicator_trigger = load_json(FILENAMEINDICATORTRIGGER)
     tool = load_json(FILENAMETOOL)
+    exchange = load_json(FILENAMEEXCHANGE)
     if chat_id not in prev_timefram_minute_list:
         prev_timefram_minute_list[chat_id] = dict([[x, ""] for x in timeframe_list])
     for timeframe_minute in prev_timefram_minute_list[chat_id]:
@@ -239,7 +262,7 @@ async def retrieve_all_signals(chat_id, timeframe_list, message, pair_list):
                 for signal_list in signal_type_list:
                     await message.reply_text(
                         get_message_content(
-                            signal_list, timeframe_minute, base_coin[chat_id], tool[chat_id]),
+                            signal_list, timeframe_minute, base_coin[chat_id], tool[chat_id], exchange[chat_id]),
                         parse_mode=ParseMode.MARKDOWN_V2)
 
 async def get_signals(context: CallbackContext):
