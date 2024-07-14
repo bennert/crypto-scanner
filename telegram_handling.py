@@ -378,7 +378,7 @@ async def start_signals(update: Update, context: CallbackContext):
         while updating_pair_list[chat_id]:
             time.sleep(5)
             updating_text += "."
-            msg.edit_text(updating_text)
+            await msg.edit_text(updating_text)
     await msg.edit_text("Checking signals of pair list:...")
     pair_list_with_volume = get_pair_list_with_volume(
         pair_list=pair_list[chat_id], min_quote_volume=min_quote_volume[chat_id])
