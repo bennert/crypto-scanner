@@ -507,7 +507,7 @@ async def poll_tool(update: Update, context: CallbackContext) -> None:
     """Poll tool"""
     tools = list(tool_url.keys())
     message = await context.bot.send_poll(
-        update.effective_chat.id,
+        update.message.chat.id,
         "Select tool", 
         tools,
         is_anonymous=False,
@@ -517,7 +517,7 @@ async def poll_tool(update: Update, context: CallbackContext) -> None:
         message.poll.id: {
             "poll": CMD_POLL_TOOL,
             "questions": tools,
-            "chat_id": update.effective_chat.id,
+            "chat_id": update.message.chat.id,
             "message_id": message.message_id,
             "answers": 0
         }
