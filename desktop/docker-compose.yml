@@ -1,0 +1,7 @@
+version: '3'
+services:
+  crypto-scanner:
+    image: bennert/crypto-scanner:latest
+    volumes:
+      - ./secrets:/secrets
+      - ./state:/state
