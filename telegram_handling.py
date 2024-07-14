@@ -52,7 +52,8 @@ altrady_exchange = {
 def get_tool_url(tool, exchange, pair, timeframe_minute):
     """Get tool url"""
     if tool == "tradingview":
-        return tool_url[tool] + exchange.upper() + "%3A" + pair.replace('/', '') + f"&interval={timeframe_minute}"
+        return tool_url[tool] + exchange.upper() + "%3A" + pair.replace('/', '') + \
+               f"&interval={timeframe_minute}"
     elif tool == "hypertrader":
         return tool_url[tool]
     elif tool == "kucoin":
@@ -263,7 +264,11 @@ async def retrieve_all_signals(chat_id, timeframe_list, message, pair_list):
                 for signal_list in signal_type_list:
                     await message.reply_text(
                         get_message_content(
-                            signal_list, timeframe_minute, base_coin[chat_id], tool[chat_id], exchange[chat_id]),
+                            signal_list,
+                            timeframe_minute,
+                            base_coin[chat_id],
+                            tool[chat_id],
+                            exchange[chat_id]),
                         parse_mode=ParseMode.MARKDOWN_V2)
 
 async def get_signals(context: CallbackContext):
@@ -272,7 +277,11 @@ async def get_signals(context: CallbackContext):
     chat_id = str(message.chat_id)
     timeframe_list = load_json(FILENAMETIMEFRAMELIST)
 
-    await retrieve_all_signals(chat_id, timeframe_list[chat_id], message, load_json(FILENAMEPAIRLIST))
+    await retrieve_all_signals(
+        chat_id,
+        timeframe_list[chat_id],
+        message,
+        load_json(FILENAMEPAIRLIST))
 
 async def generate_pair_list(context: CallbackContext):
     """Generate pair list"""
