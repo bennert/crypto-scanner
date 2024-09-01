@@ -23,6 +23,12 @@ def set_exchange(exchange_name):
     else:
         EXCHANGE = ccxt.binance()
 
+def set_previous_timeframe_minute_list(chat_id, timeframe_minute_list):
+    """Set previous timeframe minute list"""
+    global prev_timefram_minute_list
+    prev_timefram_minute_list[chat_id] = dict([[x, ""] for x in timeframe_minute_list])
+
+
 async def get_pair_list(base_coin, min_day_volume, message, heading):
     """Get pair list"""
     EXCHANGE.load_markets()

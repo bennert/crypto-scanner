@@ -12,7 +12,7 @@ from file_handling import (
     FILENAMEEXCHANGE, FILENAMEMINQUOTEVOLUME, FILENAMETIMEFRAMELIST, FILENAMEBASECOIN,
     FILENAMEPAIRLIST, FILENAMEBUYSIGNALSACTIVE, FILENAMEINDICATORTRIGGER, FILENAMETOOL)
 from exchange_handling import (set_exchange, fetch_ticker, get_pair_list, retrieve_signals,
-                               prev_timefram_minute_list)
+                               prev_timefram_minute_list, set_previous_timeframe_minute_list)
 
 FILENAMESECRETS = "./secrets/.env"
 
@@ -130,6 +130,7 @@ async def receive_poll_selection(update: Update, context: CallbackContext) -> No
         for question_id in answer.option_ids:
             timeframe_list.append(questions[question_id])
         update_json(FILENAMETIMEFRAMELIST, chat_id, timeframe_list)
+        set_previous_timeframe_minute_list(chat_id, timeframe_list)
     elif poll == CMD_POLL_BASECOIN:
         update_json(FILENAMEBASECOIN, chat_id, questions[answer.option_ids[0]])
     elif poll == CMDPOLLPAIRLIST:
@@ -275,11 +276,11 @@ async def get_signals(context: CallbackContext):
     """Get signals"""
     message = context.job.data["message"]
     chat_id = str(message.chat_id)
-    timeframe_list = load_json(FILENAMETIMEFRAMELIST)
+    time_frame_list = load_json(FILENAMETIMEFRAMELIST)
 
     await retrieve_all_signals(
         chat_id,
-        timeframe_list[chat_id],
+        time_frame_list[chat_id],
         message,
         load_json(FILENAMEPAIRLIST))
 
@@ -374,6 +375,12 @@ async def start_signals(update: Update, context: CallbackContext):
         await stop_signals(update, context)
         await poll_min_quote_volume(update, context)
         return
+
+    time_frame_list = load_json(FILENAMETIMEFRAMELIST)
+    if chat_id not in time_frame_list.keys():
+        await poll_time_frame(update, context)
+        return
+
     min_day_volume = float(min_quote_volume[chat_id])/1000000
     pair_list = load_json(FILENAMEPAIRLIST)
     if chat_id not in pair_list.keys() or len(pair_list[chat_id]) == 0:
