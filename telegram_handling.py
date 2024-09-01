@@ -301,7 +301,6 @@ async def generate_pair_list(context: CallbackContext):
     job_buy = get_job(context.application.job_queue, chat_id)
     if job_buy is not None:
         job_buy.pause()
-    set_exchange("kucoin")
     valid_coin_pairs = await get_pair_list(base_coin[chat_id], min_day_volume, msg, heading)
     update_json(FILENAMEPAIRLIST, chat_id, valid_coin_pairs)
 
