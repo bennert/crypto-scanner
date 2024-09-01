@@ -1,11 +1,16 @@
+"""File handling for json files"""
+
 import json
 import os
 
 FILENAMEBUYSIGNALSACTIVE = "./state/buysignalsactive.json"
+FILENAMEEXCHANGE = "./state/exchange.json"
 FILENAMEMINQUOTEVOLUME = "./state/minquotevol.json"
+FILENAMETIMEFRAMELIST = "./state/timeframelist.json"
 FILENAMEBASECOIN = "./state/basecoin.json"
 FILENAMEPAIRLIST = "./state/pairlist.json"
-FILENAMEMINSTOCHRSI = "./state/minstochrsi.json"
+FILENAMEINDICATORTRIGGER = "./state/indicator_trigger.json"
+FILENAMETOOL = "./state/tool.json"
 
 def add_json(file_name, chat_id, value):
     """Add json value of chat_id to file"""
@@ -33,4 +38,5 @@ def save_json(file_name, json_value):
         json.dump(json_value, file)
 
 def file_exists(file_name):
+    """Check if file exists"""
     return os.path.isfile(file_name)

@@ -64,11 +64,29 @@ jobs:
           echo "CommitsSinceVersionSourcePadded: ${{ steps.gitversion.outputs.commitsSinceVersionSourcePadded }}"
           echo "UncommittedChanges: ${{ steps.gitversion.outputs.uncommittedChanges }}"
           echo "CommitDate: ${{ steps.gitversion.outputs.commitDate }}"
-      - name: Build and Push Docker image
-        uses: docker/build-push-action@v4
+      - name: Build and Push container image to Docker Hub
+        uses: docker/build-push-action@v5
         with:
           context: .
           file: ./Dockerfile
-          platforms: ${{ env.PLATFORMS }}
+          platforms: linux/amd64,linux/arm64
           push: true
-          tags: ${{ env.REGISTRY_IMAGE }}:latest,${{ env.REGISTRY_IMAGE }}:version${{ steps.gitversion.outputs.assemblySemVer }}.${{ steps.gitversion.outputs.buildMetaDataPadded }}
+          tags: |
+            ${{ env.REGISTRY_IMAGE }}:latest
+            ${{ env.REGISTRY_IMAGE }}:version${{ steps.gitversion.outputs.assemblySemVer }}.${{ steps.gitversion.outputs.buildMetaDataPadded }}
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build and Push container image to GitHub Container Registry
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/${{ env.REGISTRY_IMAGE }}:latest
+            ghcr.io/${{ github.repository_owner }}/${{ env.REGISTRY_IMAGE }}:version${{ steps.gitversion.outputs.assemblySemVer }}.${{ steps.gitversion.outputs.buildMetaDataPadded }}

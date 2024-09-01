@@ -1,9 +1,8 @@
-ccxt==4.0.45
-numpy==1.25.2
-pandas==2.0.3
-python-dotenv==1.0.0
-python-telegram-bot==20.4
-python-telegram-bot[job-queue]==20.4
-pytz==2023.3
-ta==0.10.2
-cryptography==3.4.6
+ccxt==4.3.58
+numpy==2.0.0
+pandas==2.2.2
+python-dotenv==1.0.1
+python-telegram-bot==21.3
+python-telegram-bot[job-queue]==21.3
+pytz==2024.1
+ta==0.11.0
