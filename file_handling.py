@@ -34,7 +34,8 @@ def load_json(file_name):
 
 def save_json(file_name, json_value):
     """Save json string to file"""
-    with open(file_name, 'w', encoding="utf-8") as file:
+    os.makedirs(os.path.dirname(file_name), exist_ok=True)
+    with open(file_name, 'w+', encoding="utf-8") as file:
         json.dump(json_value, file)
 
 def file_exists(file_name):
