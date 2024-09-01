@@ -301,12 +301,18 @@ async def generate_pair_list(context: CallbackContext):
     job_buy = get_job(context.application.job_queue, chat_id)
     if job_buy is not None:
         job_buy.pause()
-    set_exchange("kucoin")
     valid_coin_pairs = await get_pair_list(base_coin[chat_id], min_day_volume, msg, heading)
     update_json(FILENAMEPAIRLIST, chat_id, valid_coin_pairs)
 
-    await msg.edit_text("Pair List updated")
+    await msg.edit_text(f"Pair List updated with {len(valid_coin_pairs)} pairs")
     updating_pair_list[chat_id] = False
+
+    max_pair_list = 200
+    if len(valid_coin_pairs) > max_pair_list:
+        await msg.reply_text(
+            f"Pair list is too long. Please make a selection of the pairs (<{max_pair_list}).")
+        poll_pair_list(update, context)
+
     if job_buy is not None:
         job_buy.resume()
 
@@ -499,16 +505,21 @@ async def display_settings(update: Update, context: CallbackContext):
         return
     pair_list_with_volume = get_pair_list_with_volume(
         pair_list=pair_list[chat_id], min_quote_volume=min_quote_volume[chat_id])
-
-    await message.reply_text(
-        "Settings:\n" + \
-        f"Tool: {tool[chat_id]}\n" + \
-        f"Exchange: {exchange[chat_id]}\n" + \
-        f"Base Coin: {base_coin[chat_id]}\n" + \
-        f"Minimum Quote Volume: {min_quote_volume[chat_id]}\n" + \
-        f"Time Frame List: {', '.join(time_frame_list[chat_id])}\n" + \
-        f"Indicator Trigger: {', '.join(indicator_trigger[chat_id])}\n" + \
-        "Pair List:\n* " + ("\n* ".join(sorted(pair_list_with_volume))))
+    max_pair_list = 200
+    if len(pair_list_with_volume) > max_pair_list:
+        await message.reply_text(
+            f"Pair list is too long. Please make a selection of the pairs (<{max_pair_list}).")
+        poll_pair_list(update, context)
+    else:
+        await message.reply_text(
+            "Settings:\n" + \
+            f"Tool: {tool[chat_id]}\n" + \
+            f"Exchange: {exchange[chat_id]}\n" + \
+            f"Base Coin: {base_coin[chat_id]}\n" + \
+            f"Minimum Quote Volume: {min_quote_volume[chat_id]}\n" + \
+            f"Time Frame List: {', '.join(time_frame_list[chat_id])}\n" + \
+            f"Indicator Trigger: {', '.join(indicator_trigger[chat_id])}\n" + \
+            "Pair List:\n* " + ("\n* ".join(sorted(pair_list_with_volume))))
 
 async def poll_tool(update: Update, context: CallbackContext) -> None:
     """Poll tool"""
