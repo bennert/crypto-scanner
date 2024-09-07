@@ -61,7 +61,11 @@ def get_tool_url(tool, exchange, pair, timeframe_minute):
     elif tool == "altrady":
         pair_swapped = pair.split('/')
         pair_swapped.reverse()
-        return tool_url[tool] + altrady_exchange[exchange] + "_" + '_'.join(pair_swapped)
+        altrady_exchange_str = altrady_exchange[exchange]
+        if ":" in pair_swapped[0]:
+            altrady_exchange_str += "f"
+            pair_swapped[0] = pair_swapped[0].split(":")[0]
+        return tool_url[tool] + altrady_exchange_str + "_" + '_'.join(pair_swapped)
     else:
         return ""
 
