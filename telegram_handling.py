@@ -311,12 +311,6 @@ async def generate_pair_list(context: CallbackContext):
     await msg.edit_text(f"Pair List updated with {len(valid_coin_pairs)} pairs")
     updating_pair_list[chat_id] = False
 
-    max_pair_list = 200
-    if len(valid_coin_pairs) > max_pair_list:
-        await msg.reply_text(
-            f"Pair list is too long. Please make a selection of the pairs (<{max_pair_list}).")
-        poll_pair_list(update, context)
-
     if job_buy is not None:
         job_buy.resume()
 
@@ -405,13 +399,18 @@ async def start_signals(update: Update, context: CallbackContext):
             time.sleep(5)
             updating_text += "."
             await msg.edit_text(updating_text)
-    await msg.edit_text("Checking signals of pair list:...")
+    await msg.edit_text(
+        "Checking signals with minimum day volume " + \
+        f"on {exchange[chat_id]} of {min_day_volume:7.0f}M {base_coin[chat_id]} of Pair List:")
     pair_list_with_volume = get_pair_list_with_volume(
         pair_list=pair_list[chat_id], min_quote_volume=min_quote_volume[chat_id])
-    await msg.edit_text(
-        "Checking signals of pair list:\n* " + ("\n* ".join(sorted(pair_list_with_volume))) + \
-        "\nwith minimum day volume " + \
-        f"on {exchange[chat_id]} of {min_day_volume:7.0f}M {base_coin[chat_id]}")
+
+    text = "\n* ".join(sorted(pair_list_with_volume))
+    max_length = 4096
+    parts = [text[i:i+max_length] for i in range(0, len(text), max_length)]
+
+    for part in parts:
+        await msg.reply_text(part)
 
     data = context.user_data
     data["update"] = update
@@ -509,21 +508,23 @@ async def display_settings(update: Update, context: CallbackContext):
         return
     pair_list_with_volume = get_pair_list_with_volume(
         pair_list=pair_list[chat_id], min_quote_volume=min_quote_volume[chat_id])
-    max_pair_list = 200
-    if len(pair_list_with_volume) > max_pair_list:
-        await message.reply_text(
-            f"Pair list is too long. Please make a selection of the pairs (<{max_pair_list}).")
-        poll_pair_list(update, context)
-    else:
-        await message.reply_text(
-            "Settings:\n" + \
-            f"Tool: {tool[chat_id]}\n" + \
-            f"Exchange: {exchange[chat_id]}\n" + \
-            f"Base Coin: {base_coin[chat_id]}\n" + \
-            f"Minimum Quote Volume: {min_quote_volume[chat_id]}\n" + \
-            f"Time Frame List: {', '.join(time_frame_list[chat_id])}\n" + \
-            f"Indicator Trigger: {', '.join(indicator_trigger[chat_id])}\n" + \
-            "Pair List:\n* " + ("\n* ".join(sorted(pair_list_with_volume))))
+    await message.reply_text(
+        "Settings:\n" +
+        f"Tool: {tool[chat_id]}\n" +
+        f"Exchange: {exchange[chat_id]}\n" +
+        f"Base Coin: {base_coin[chat_id]}\n" +
+        f"Minimum Quote Volume: {min_quote_volume[chat_id]}\n" +
+        f"Time Frame List: {', '.join(time_frame_list[chat_id])}\n" +
+        f"Indicator Trigger: {', '.join(indicator_trigger[chat_id])}\n")
+
+    # Split the long message into smaller messages
+    text = f"Pair List with {len(pair_list_with_volume)} pairs:\n* " + \
+        ("\n* ".join(sorted(pair_list_with_volume)))
+    max_length = 4096
+    parts = [text[i:i+max_length] for i in range(0, len(text), max_length)]
+
+    for part in parts:
+        await message.reply_text(part)
 
 async def poll_tool(update: Update, context: CallbackContext) -> None:
     """Poll tool"""
