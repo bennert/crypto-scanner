@@ -65,7 +65,11 @@ async def retrieve_signals(
     chat_id = str(message.chat_id)
     timeframe_hour = 60 / int(timeframe_minute)
     timeframe_day = int(24 * timeframe_hour)
-    timeframe = str(timeframe_minute) + 'm'
+    timeframe_minute = int(timeframe_minute)
+    if timeframe_minute > 30:
+        timeframe = str(timeframe_minute / 60) + 'h'
+    else:
+        timeframe = str(timeframe_minute) + 'm'
     data = {}
     for pair in pair_list[chat_id]:
         if len(data) > 0 and pair in data:
