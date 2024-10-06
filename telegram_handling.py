@@ -606,7 +606,8 @@ async def poll_time_frame(update: Update, context: CallbackContext) -> None:
         "1",
         "3",
         "5",
-        "15"
+        "15",
+        "60"
     ]
     message = await context.bot.send_poll(
         update.effective_chat.id,
