@@ -78,6 +78,8 @@ async def retrieve_signals(
         bars = EXCHANGE.fetch_ohlcv(pair, timeframe=timeframe, limit=timeframe_day)
         data_frame = pd.DataFrame(
             bars[:-1], columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
+        if data_frame.empty:
+            continue
         timestamp = int(data_frame["timestamp"].iloc[-1])/1000
         date_time = datetime.fromtimestamp(timestamp, pytz.timezone('Europe/Amsterdam'))
         if len(data) == 0:
