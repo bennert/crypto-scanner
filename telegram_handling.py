@@ -405,7 +405,7 @@ async def start_signals(update: Update, context: CallbackContext):
     pair_list_with_volume = get_pair_list_with_volume(
         pair_list=pair_list[chat_id], min_quote_volume=min_quote_volume[chat_id])
 
-    text = "\n* ".join(sorted(pair_list_with_volume))
+    text = "*" + "\n*".join(sorted(pair_list_with_volume))
     max_length = 4096
     parts = [text[i:i+max_length] for i in range(0, len(text), max_length)]
 
@@ -518,8 +518,8 @@ async def display_settings(update: Update, context: CallbackContext):
         f"Indicator Trigger: {', '.join(indicator_trigger[chat_id])}\n")
 
     # Split the long message into smaller messages
-    text = f"Pair List with {len(pair_list_with_volume)} pairs:\n* " + \
-        ("\n* ".join(sorted(pair_list_with_volume)))
+    text = f"Pair List with {len(pair_list_with_volume)} pairs:\n*" + \
+        ("\n*".join(sorted(pair_list_with_volume)))
     max_length = 4096
     parts = [text[i:i+max_length] for i in range(0, len(text), max_length)]
 
