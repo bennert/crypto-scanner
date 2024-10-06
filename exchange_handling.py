@@ -5,7 +5,7 @@ import pandas as pd
 import pytz
 
 from ta.momentum import RSIIndicator, StochRSIIndicator, StochasticOscillator
-from ta.trend import MACD
+from ta.trend import MACD, EMAIndicator
 from ta.volatility import BollingerBands
 from telegram.error import TimedOut
 
@@ -98,6 +98,7 @@ async def retrieve_signals(
         indicator_rsi = RSIIndicator(close=data_frame["close"], window=14)
         indicator_macd = MACD(
             close=data_frame["close"], window_slow=26, window_fast=12, window_sign=9)
+        indicator_ema200 = EMAIndicator(close=data_frame["close"], window=200)
 
         openday = data_frame['open'].iloc[0]
         close = data_frame['close'].iloc[-1]
@@ -148,6 +149,8 @@ async def retrieve_signals(
         data_frame['macdSignal'] = indicator_macd.macd_signal()
         data_frame['macdDiff'] = indicator_macd.macd_diff()
 
+        data_frame['ema200'] = indicator_ema200.ema_indicator()
+
         data[pair] = {
             "pair": pair,
             "datetime": date_time, #df['timestamp'].iloc[-1],
@@ -166,6 +169,7 @@ async def retrieve_signals(
             "macdValue": data_frame['macdValue'].iloc[-1],
             "macdSignal": data_frame['macdSignal'].iloc[-1],
             "macdDiff": data_frame['macdDiff'].iloc[-1],
+            "ema200": data_frame['ema200'].iloc[-1],
             "bbBuy": bb_buy,
             "stochBuy": stoch_buy,
             "stochRsiBuy": stoch_rsi_buy,

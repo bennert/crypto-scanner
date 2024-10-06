@@ -216,6 +216,7 @@ def get_message_content(item, timeframe_minute, base_coin, tool, exchange):
     macd_value = item["macdValue"]
     macd_signal = item.get("macdSignal", 0)
     macd_diff = item.get("macdDiff", 0)
+    ema200 = item.get("ema200", 0)
     momentum_emoji = ""
     for key, val in emoji_momentum_level.items():
         if momentum_strength in key:
@@ -224,6 +225,7 @@ def get_message_content(item, timeframe_minute, base_coin, tool, exchange):
         previour_date_time = date_time
         message_content += f"{signal_emoji} *{date_time.strftime('%Y %m %d %H%M')} " + \
             f"| {timeframe_minute} min*\n"
+    ema200_arrow = "\U00002B07" if close < ema200 else "\U00002B06"  # Down arrow if close < ema200, else up arrow
     message_content += \
         f"{momentum_emoji} {momentum_strength}% *{pair_url} | [{signal[signal_type]}]*\n" \
         f"Change day: {change_day:.2f} | {change_day_perc:.2f}% | " + \
@@ -241,6 +243,7 @@ def get_message_content(item, timeframe_minute, base_coin, tool, exchange):
         f"RSI: {rsi:.2f}%" \
         f"{'*' if rsi_signal else ''}\n" \
         f"MACD: {macd_value:.3f} Signal: {macd_signal:.3f} Histogram: {macd_diff:.3f}\n" \
+        f"EMA200: {ema200:.5f} {ema200_arrow}\n" \
         f"Close: {close:.5f}\n\n"
     return message_content.replace(".", r"\.").replace("|", r"\|").replace("-", r"\-") \
         .replace("{", r"\{").replace("}", r"\}")
