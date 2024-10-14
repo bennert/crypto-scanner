@@ -67,7 +67,7 @@ async def retrieve_signals(
     timeframe_day = int(24 * timeframe_hour)
     timeframe_minute = int(timeframe_minute)
     if timeframe_minute > 30:
-        timeframe = str(timeframe_minute / 60) + 'h'
+        timeframe = str(int(timeframe_minute / 60)) + 'h'
     else:
         timeframe = str(timeframe_minute) + 'm'
     data = {}
