@@ -225,7 +225,8 @@ def get_message_content(item, timeframe_minute, base_coin, tool, exchange):
         previour_date_time = date_time
         message_content += f"{signal_emoji} *{date_time.strftime('%Y %m %d %H%M')} " + \
             f"| {timeframe_minute} min*\n"
-    ema200_arrow = "\U00002B07" if close < ema200 else "\U00002B06"  # Down arrow if close < ema200, else up arrow
+    # Down arrow if close < ema200, else up arrow
+    ema200_arrow = "\U00002B07" if close < ema200 else "\U00002B06"
     message_content += \
         f"{momentum_emoji} {momentum_strength}% *{pair_url} | [{signal[signal_type]}]*\n" \
         f"Change day: {change_day:.2f} | {change_day_perc:.2f}% | " + \
