@@ -1,5 +1,7 @@
 """ Telegram handling module """
 import time
+from datetime import datetime
+import pytz
 import numpy as np
 
 from dotenv import dotenv_values
@@ -255,9 +257,7 @@ async def retrieve_all_signals(chat_id, timeframe_list, message, pair_list):
     indicator_trigger = load_json(FILENAMEINDICATORTRIGGER)
     tool = load_json(FILENAMETOOL)
     exchange = load_json(FILENAMEEXCHANGE)
-    if chat_id not in prev_timefram_minute_list:
-        prev_timefram_minute_list[chat_id] = dict([[x, ""] for x in timeframe_list])
-    for timeframe_minute in prev_timefram_minute_list[chat_id]:
+    for timeframe_minute in timeframe_list:
         signal_list = await retrieve_signals(
             message, timeframe_minute, pair_list, indicator_trigger[chat_id])
         for signal_type in ["Buy", "Sell"]:
@@ -285,6 +285,12 @@ async def get_signals(context: CallbackContext):
     message = context.job.data["message"]
     chat_id = str(message.chat_id)
     time_frame_list = load_json(FILENAMETIMEFRAMELIST)
+    if chat_id not in prev_timefram_minute_list:
+        prev_timefram_minute_list[chat_id] = {}
+        for timeframe in time_frame_list[chat_id]:
+            prev_timefram_minute_list[chat_id][int(timeframe)] = datetime.now(
+                pytz.timezone('Europe/Amsterdam')
+            )
 
     await retrieve_all_signals(
         chat_id,
