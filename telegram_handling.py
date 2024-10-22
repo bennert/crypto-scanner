@@ -169,11 +169,6 @@ def get_message_content(item, timeframe_minute, base_coin, tool, exchange):
     signal_list = {}
     signal = {}
 
-    bb_signal = item["bbBuy"] or item["bbSell"]
-    stoch_signal = item["stochBuy"] or item["stochSell"]
-    stoch_rsi_signal = item["stochRsiBuy"] or item["stochRsiSell"]
-    rsi_signal = item["rsiBuy"] or item["rsiSell"]
-
     bb_buy = item["bbBuy"]
     stoch_buy = item["stochBuy"]
     stoch_rsi_buy = item["stochRsiBuy"]
@@ -184,17 +179,25 @@ def get_message_content(item, timeframe_minute, base_coin, tool, exchange):
     stoch_rsi_sell = item["stochRsiSell"]
     rsi_sell = item["rsiSell"]
 
+    bb_signal = bb_buy or bb_sell
+    stoch_signal = stoch_buy or stoch_sell
+    stoch_rsi_signal = stoch_rsi_buy or stoch_rsi_sell
+    rsi_signal = rsi_buy or rsi_sell
+    rsi_max = 70
+    rsi_min = 30
+    rsi = item["rsi"]
+
     signal_list["Buy"] = [
         "BB" if bb_buy else '',
         "Stoch" if stoch_buy else '',
         "StochRsi" if stoch_rsi_buy else '',
-        "RSI" if rsi_buy else ''
+        "RSIpre" if rsi_buy and rsi > rsi_min else "RSI" if rsi_buy else ''
     ]
     signal_list["Sell"] = [
         "BB" if bb_sell else '',
         "Stoch" if stoch_sell else '',
         "StochRsi" if stoch_rsi_sell else '',
-        "RSI" if rsi_sell else ''
+        "RSIpre" if rsi_sell and rsi < rsi_max else "RSI" if rsi_sell else ''
     ]
     signal_list["Buy"] = [x for x in signal_list["Buy"] if x != '']
     signal_list["Sell"] = [x for x in signal_list["Sell"] if x != '']
@@ -211,9 +214,8 @@ def get_message_content(item, timeframe_minute, base_coin, tool, exchange):
     stoch_d = item["stochD"]
     stoch_rsi_d = item["stochRsiD"]
     stoch_rsi_k = item["stochRsiK"]
-    rsi = item["rsi"]
     # Calculate momentum strength by using combination of stoch and rsi
-    momentum_strength = round(rsi) if stoch_buy or stoch_sell else 50
+    momentum_strength = round(rsi)
 
     macd_value = item["macdValue"]
     macd_signal = item.get("macdSignal", 0)

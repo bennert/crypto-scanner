@@ -146,10 +146,11 @@ async def retrieve_signals(
             data_frame['stochRsiK'].iloc[-1] > stoch_rsi_max
 
         data_frame['rsi'] = indicator_rsi.rsi()
+        rsi_before = 5
         rsi_max = 70
         rsi_min = 30
-        rsi_buy = data_frame['rsi'].iloc[-1] < rsi_min
-        rsi_sell = data_frame['rsi'].iloc[-1] > rsi_max
+        rsi_buy = data_frame['rsi'].iloc[-1] < rsi_min + rsi_before
+        rsi_sell = data_frame['rsi'].iloc[-1] > rsi_max - rsi_before
 
         data_frame['macdValue'] = indicator_macd.macd()
         data_frame['macdSignal'] = indicator_macd.macd_signal()
