@@ -198,8 +198,8 @@ async def retrieve_signals(
                 continue
         if buy:
             buy_list.append(value)
-    sell_list = []
 
+    sell_list = []
     for _, value in data.items():
         sell = True
         for indicator in indicator_trigger_list:
