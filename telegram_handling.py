@@ -619,6 +619,7 @@ async def poll_time_frame(update: Update, context: CallbackContext) -> None:
         "3",
         "5",
         "15",
+        "30",
         "60"
     ]
     message = await context.bot.send_poll(
