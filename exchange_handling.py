@@ -63,8 +63,6 @@ async def retrieve_signals(
         message, timeframe_minute, pair_list, indicator_trigger_list):
     """Retrieve buy and sell signals"""
     chat_id = str(message.chat_id)
-    timeframe_hour = 60 / int(timeframe_minute)
-    timeframe_day = int(24 * timeframe_hour)
     timeframe_minute = int(timeframe_minute)
     if timeframe_minute > 30:
         timeframe = str(int(timeframe_minute / 60)) + 'h'
@@ -79,7 +77,7 @@ async def retrieve_signals(
             continue
         quote_volume_m = ticker["quoteVolume"]/1000000
 
-        bars = EXCHANGE.fetch_ohlcv(pair, timeframe=timeframe, limit=timeframe_day)
+        bars = EXCHANGE.fetch_ohlcv(pair, timeframe=timeframe, limit=500)
         data_frame = pd.DataFrame(
             bars[:-1], columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
         if data_frame.empty:
