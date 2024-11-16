@@ -12,7 +12,8 @@ from telegram.ext import (Application, CallbackContext, CommandHandler,
 from file_handling import (
     file_exists, add_json, load_json, update_json, save_json,
     FILENAMEEXCHANGE, FILENAMEMINQUOTEVOLUME, FILENAMETIMEFRAMELIST, FILENAMEBASECOIN,
-    FILENAMEPAIRLIST, FILENAMEBUYSIGNALSACTIVE, FILENAMEINDICATORTRIGGER, FILENAMETOOL)
+    FILENAMEPAIRLIST, FILENAMEBUYSIGNALSACTIVE, FILENAMEINDICATORTRIGGER, FILENAMETOOL,
+    FILENAMEBOTLOCK)
 from exchange_handling import (set_exchange, fetch_ticker, get_pair_list, retrieve_signals,
                                prev_timefram_minute_list, set_previous_timeframe_minute_list)
 
@@ -87,9 +88,27 @@ emoji_momentum_level = {
     range(80, 101): "\U0001F7E5",  # Red square
 }
 
+def is_bot_locked():
+    """Check if bot is locked"""
+    if not file_exists(FILENAMEBOTLOCK):
+        save_json(FILENAMEBOTLOCK, False)
+    return load_json(FILENAMEBOTLOCK)
+
+def lock_bot():
+    """Lock bot"""
+    save_json(FILENAMEBOTLOCK, True)
+
+def unlock_bot():
+    """Unlock bot"""
+    save_json(FILENAMEBOTLOCK, False)
+
 def start_telegram_bot():
     """Start telegram bot"""
     if file_exists(FILENAMESECRETS):
+        if is_bot_locked():
+            print("Bot is already in use")
+            return
+        lock_bot()
         secrets = dotenv_values(FILENAMESECRETS)
         token = secrets["TELEGRAM_TOKEN_SCANNER"]
         application = Application.builder().token(token).build()
@@ -99,6 +118,7 @@ def start_telegram_bot():
         application.run_polling(poll_interval=1.0, timeout=180)
     else:
         print(f"Missing secret file: {FILENAMESECRETS} with telegram token")
+    unlock_bot()
 
 # Support methods
 def get_job(job_queue, name):
