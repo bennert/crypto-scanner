@@ -25,6 +25,7 @@ CMD_STOP_SIGNALS = "StopSignals"
 CMD_CHECK_STATUS = "CheckStatus"
 
 CMD_DISPLAY_SETTINGS = "DisplaySettings"
+CMD_DISPLAY_PAIRS = "DisplayPairs"
 
 CMD_POLL_TOOL = "PollTool"
 CMD_POLL_EXCHANGE = "PollExchange"
@@ -363,6 +364,7 @@ async def start(update: Update, context: CallbackContext):
         (CMD_STOP_SIGNALS if signals_active_chat_id else CMD_START_SIGNALS),
         CMD_CHECK_STATUS,
         CMD_DISPLAY_SETTINGS,
+        CMD_DISPLAY_PAIRS,
         CMD_POLL_TOOL,
         CMD_POLL_EXCHANGE,
         CMD_POLL_MIN_QUOTE_VOLUME,
@@ -489,16 +491,29 @@ def get_pair_list_with_volume(pair_list, min_quote_volume):
         if ticker is None:
             continue
         quote_volume = ticker["quoteVolume"]
-        if quote_volume > float(min_quote_volume):
+        if quote_volume is not None and quote_volume > float(min_quote_volume):
             pair_list_with_volume.append(f"{quote_volume/1000000:7.2f}M => {coin_pair}")
     return pair_list_with_volume
+
+async def display_pair_list_header(update: Update, context: CallbackContext):
+    """Display pair list header"""
+    message = update.message if update.callback_query is None else update.callback_query.message
+    chat_id = str(message.chat_id)
+
+    pair_list = load_json(FILENAMEPAIRLIST)
+    if chat_id not in pair_list.keys():
+        await update_pair_list(update, context)
+        await message.reply_text(
+            f"First select pairs with /{CMDPOLLPAIRLIST} and click again on " + \
+            f"/{CMD_DISPLAY_PAIRS} to display the pair list" + \
+            f"/{CMD_DISPLAY_SETTINGS} to display the settings")
+        return
+    await message.reply_text(f"Pair List contains {len(pair_list[chat_id])} pairs")
 
 async def display_settings(update: Update, context: CallbackContext):
     """Display settings"""
     message = update.message if update.callback_query is None else update.callback_query.message
     chat_id = str(message.chat_id)
-
-    await message.reply_text("Getting settings...\nPlease wait till finished")
 
     tool = load_json(FILENAMETOOL)
     if chat_id not in tool.keys():
@@ -531,15 +546,6 @@ async def display_settings(update: Update, context: CallbackContext):
         await poll_indicator_trigger(update, context)
         return
 
-    pair_list = load_json(FILENAMEPAIRLIST)
-    if chat_id not in pair_list.keys():
-        await update_pair_list(update, context)
-        await message.reply_text(
-            f"First select pairs with /{CMDPOLLPAIRLIST} and click again on " + \
-            f"/{CMD_DISPLAY_SETTINGS}")
-        return
-    pair_list_with_volume = get_pair_list_with_volume(
-        pair_list=pair_list[chat_id], min_quote_volume=min_quote_volume[chat_id])
     await message.reply_text(
         "Settings:\n" +
         f"Tool: {tool[chat_id]}\n" +
@@ -548,10 +554,28 @@ async def display_settings(update: Update, context: CallbackContext):
         f"Minimum Quote Volume: {min_quote_volume[chat_id]}\n" +
         f"Time Frame List: {', '.join(time_frame_list[chat_id])}\n" +
         f"Indicator Trigger: {', '.join(indicator_trigger[chat_id])}\n")
+    await display_pair_list_header(update, context)
+
+async def display_pairs(update: Update, context: CallbackContext):
+    """Display pairs"""
+    message = update.message if update.callback_query is None else update.callback_query.message
+    chat_id = str(message.chat_id)
+    min_quote_volume = load_json(FILENAMEMINQUOTEVOLUME)
+    if chat_id not in min_quote_volume.keys():
+        await poll_min_quote_volume(update, context)
+        return
+
+    await display_pair_list_header(update, context)
+    await message.reply_text("...Please wait till finished")
+
+    pair_list = load_json(FILENAMEPAIRLIST)
+    if chat_id not in pair_list.keys():
+        return
+    pair_list_with_volume = get_pair_list_with_volume(
+        pair_list=pair_list[chat_id], min_quote_volume=min_quote_volume[chat_id])
 
     # Split the long message into smaller messages
-    text = f"Pair List with {len(pair_list_with_volume)} pairs:\n*" + \
-        ("\n*".join(sorted(pair_list_with_volume)))
+    text = "*" + ("\n*".join(sorted(pair_list_with_volume)))
     max_length = 4096
     parts = [text[i:i+max_length] for i in range(0, len(text), max_length)]
 
@@ -757,6 +781,7 @@ command_dict = {
     CMD_STOP_SIGNALS: stop_signals,
     CMD_CHECK_STATUS: check_status,
     CMD_DISPLAY_SETTINGS: display_settings,
+    CMD_DISPLAY_PAIRS: display_pairs,
     CMD_POLL_TOOL: poll_tool,
     CMD_POLL_EXCHANGE: poll_exchange,
     CMD_POLL_BASECOIN: poll_base_coin,
