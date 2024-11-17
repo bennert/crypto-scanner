@@ -546,13 +546,15 @@ async def display_pairs(update: Update, context: CallbackContext):
         return
 
     await display_pair_list_header(update, context)
-    await message.reply_text("...Please wait till finished")
+    msg = await message.reply_text("Get Pair list with volume ...Please wait")
 
     pair_list = load_json(FILENAMEPAIRLIST)
     if chat_id not in pair_list.keys():
         return
     pair_list_with_volume = get_pair_list_with_volume(
         pair_list=pair_list[chat_id], min_quote_volume=min_quote_volume[chat_id])
+
+    await msg.edit_text("Finished Get Pair list with volume")
 
     # Split the long message into smaller messages
     text = "*" + ("\n*".join(sorted(pair_list_with_volume)))
