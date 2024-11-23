@@ -231,7 +231,12 @@ def get_message_content(item, timeframe_minute, base_coin, tool, exchange):
         message_content += f"{signal_emoji} *{date_time.strftime('%Y %m %d %H%M')} " + \
             f"| {timeframe_minute} min*\n"
     # Down arrow if close < ema200, else up arrow
-    ema200_arrow = "\U00002B07" if close < ema200 else "\U00002B06"
+    ema200_diff = ((close - ema200) / close) * 100
+    ema200_arrow = "\U00002B07" if ema200_diff < 0 else "\U00002B06" if ema200_diff > 0 else "\U00002B0D"
+    stoch_rsi_diff = stoch_rsi_k - stoch_rsi_d
+    stoch_rsi_arrow = "\U00002B07" if stoch_rsi_diff < 0 else "\U00002B06" if stoch_rsi_diff > 0 else "\U00002B0D"
+    stoch_diff = stoch_k - stoch_d
+    stoch_arrow = "\U00002B07" if stoch_diff < 0 else "\U00002B06" if stoch_diff > 0 else "\U00002B0D"
     message_content += \
         f"{momentum_emoji} {momentum_strength}% *{pair_url} | [{signal[signal_type]}]*\n" \
         f"Change day: {change_day:.2f} | {change_day_perc:.2f}% | " + \
@@ -240,16 +245,16 @@ def get_message_content(item, timeframe_minute, base_coin, tool, exchange):
         f"BB H|L|W: {high:.5f} | {low:.5f} | {bb_width:.2f}%" \
         f"{'*' if bb_signal else ''}\n" \
         f"{'*' if stoch_signal else ''}" \
-        f"Stoch D: {stoch_d:.2f}% K: {stoch_k:.2f}%\n" \
+        f"Stoch D: {stoch_d:.2f}% K: {stoch_k:.2f}% {stoch_arrow} {stoch_diff:.1f}%\n" \
         f"{'*' if stoch_signal else ''}" \
         f"{'*' if stoch_rsi_signal else ''}" \
-        f"StochRsi D: {stoch_rsi_d:.2f}% K: {stoch_rsi_k:.2f}%" \
+        f"StochRsi D: {stoch_rsi_d:.2f}% K: {stoch_rsi_k:.2f}% {stoch_rsi_arrow} {stoch_rsi_diff:.1f}%" \
         f"{'*' if stoch_rsi_signal else ''}\n" \
         f"{'*' if rsi_signal else ''}" \
         f"RSI: {rsi:.2f}%" \
         f"{'*' if rsi_signal else ''}\n" \
         f"MACD: {macd_value:.3f} Signal: {macd_signal:.3f} Histogram: {macd_diff:.3f}\n" \
-        f"EMA200: {ema200:.5f} {ema200_arrow}\n" \
+        f"EMA200: {ema200:.5f} {ema200_arrow} {ema200_diff:.3f}%\n" \
         f"Close: {close:.5f}\n\n"
     return message_content.replace(".", r"\.").replace("|", r"\|").replace("-", r"\-") \
         .replace("{", r"\{").replace("}", r"\}")
